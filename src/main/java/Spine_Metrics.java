@@ -3,8 +3,10 @@ import ij.ImagePlus;
 import ij.WindowManager;
 import ij.gui.ImageCanvas;
 import ij.gui.ImageWindow;
+import ij.plugin.filter.Convolver;
 import ij.plugin.filter.Filters;
 import ij.plugin.frame.PlugInFrame;
+import ij.plugin.frame.ThresholdAdjuster;
 import ij.process.ImageProcessor;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.LineSegment;
@@ -41,6 +43,13 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
             canvas = win.getCanvas();
             imageProcessor = img.getProcessor();
             imageProcessor.setColor(Color.red);
+            Convolver cv = new Convolver();
+            cv.setNormalize(false);
+            float[] H = { -0.125f, -0.125f, -0.125f,
+                          -0.125f,    1.0f,    -0.125f,
+                          -0.125f, -0.125f, -0.125f };
+            cv.convolve(imageProcessor, H, 3, 3);
+            IJ.setThreshold(1, 255, "Black & White");
             prevImgHash = img.hashCode();
             toFindEdges = true;
             p_l = p_c = p_r = nullPoint;
@@ -78,12 +87,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         int x = canvas.offScreenX(e.getX());
         int y = canvas.offScreenY(e.getY());
         img = canvas.getImage();
-        if ( toFindEdges ) {
-            toFindEdges = false;
-            IJ.run(img, "Find Edges", "");
-            IJ.showMessage("The initial image was converted to edges only");
-            e.consume();
-        } else {
+
             //img = WindowManager.getCurrentImage();
 
         /*if (prevImgHash != img.hashCode()) {
@@ -94,7 +98,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
         }*/
 
-            p = (verifyPoint(img, new Point(x, y))) ?
+            /*p = (verifyPoint(img, new Point(x, y))) ?
                     new Point(x, y) :
                     autoCorrectPoint(img, new Point(x, y));
 
@@ -111,8 +115,15 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                     } else {
                         imageProcessor.drawLine(p_l.x, p_l.y, p_r.x, p_r.y);
                         img.updateImage();
+
+                        //new logic for edges
+                        process(img);
+
+                        p_l = nullPoint;
+                        p_c = nullPoint;
+                        p_r = nullPoint;
                     }
-                }  else if (p_c.equals(nullPoint)) {
+                } /* else if (p_c.equals(nullPoint)) {
                     p_c = p;
                     imageProcessor.drawDot(p_c.x, p_c.y);
                     //IJ.showMessage(" p_l = " + p_l.x + " " + p_l.y + " p_r = " + p_r.x + " " + p_r.y + " p_c = " + p_c.x + " " + p_c.y);
@@ -121,14 +132,16 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                     p_l = nullPoint;
                     p_c = nullPoint;
                     p_r = nullPoint;
-                } else {
+                }  else {
                     e.consume();
                     //process(img);
                     //IJ.showMessage(" p_l = " + p_l.toString() + " p_r = " + p_r.toString() + " p_c = " + p_c.toString());
                 }
             } else
                 IJ.showMessage("Wrong Input", "Can't choose background pixels");
-        }
+                
+             */
+
     }
 
 
