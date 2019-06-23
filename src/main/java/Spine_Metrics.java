@@ -4,10 +4,14 @@ import ij.WindowManager;
 import ij.gui.ImageCanvas;
 import ij.gui.ImageWindow;
 import ij.plugin.PointToolOptions;
+import ij.plugin.filter.Binary;
 import ij.plugin.filter.Convolver;
 import ij.plugin.filter.Filters;
 import ij.plugin.frame.PlugInFrame;
 import ij.plugin.frame.ThresholdAdjuster;
+import ij.process.BinaryProcessor;
+import ij.process.Blitter;
+import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.LineSegment;
@@ -15,6 +19,7 @@ import org.locationtech.jts.geom.LineSegment;
 import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.util.ArrayList;
 import java.util.Optional;
 
 public class Spine_Metrics extends PlugInFrame implements MouseListener {
@@ -25,6 +30,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
     private ImageWindow win;
     private ImageProcessor imageProcessor;
     private boolean toFindEdges;
+    private int baseLineOrientation; /**Horizontal = 0, Vertival = 1 */
 
     private static final Point nullPoint = new Point(-1, -1);
 
@@ -40,6 +46,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
         try {
             img = WindowManager.getCurrentImage();
+            ImagePlus img2 = img.duplicate();
             win = img.getWindow();
             canvas = win.getCanvas();
             imageProcessor = img.getProcessor();
@@ -60,6 +67,10 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                         imageProcessor.set(i,j,255);
                 }
             }
+            IJ.run(img2, "Skeletonize (2D/3D)", "");
+
+            //imageProcessor.copyBits(img2.getProcessor(), 0, 0, Blitter.MAX);
+
             canvas.imageUpdate(img.getImage(), 32, 0, 0, W, H);
             prevImgHash = img.hashCode();
             toFindEdges = true;
@@ -86,10 +97,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
     }
 
     /**
-     * Need improve, the current logic works only if you follow the order of clicking:
-     * 1) left point
-     * 2) right point
-     * 3) point inside the spine
      * @param e - basically MouseClicked event
      */
     @Override
@@ -105,15 +112,19 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
             if (p_l.equals(nullPoint))
                 p_l = p;
             else {
+                baseLineOrientation = 1;
                 if (isBaseLineHorizontal(p_l.x, p_l.y, p.x, p.y)) {
+                    baseLineOrientation = 0;
                     if (p.x < p_l.x) {
                         p_r = p_l;
                         p_l = p;
-                    }
+                    } else
+                        p_r = p;
                 } else if (p.y < p_l.y) {
                     p_r = p_l;
                     p_l = p;
-                }
+                } else
+                    p_r = p;
                 process2(img);
             }
         } else {
@@ -185,9 +196,74 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
 
     void process2(ImagePlus img) {
+        Point nextPoint = p_l;
+        ArrayList<Point> edge = new ArrayList<>();
+        edge.add(new Point(p_l));
+        boolean isMovingUp = false;
+        //int arrayPad = 1;
+        if (baseLineOrientation == 0) {
 
+            while (verifyPoint(img, nextPoint.x+1, nextPoint.y)) {
+                nextPoint.x += 1;
+                edge.add(new Point(nextPoint));
+                //if (arrayPad > 0) arrayPad--;
+            }
+
+            if (verifyPoint(img, nextPoint.x, nextPoint.y-1)) {
+                nextPoint.y -= 1;
+                edge.add(new Point(nextPoint));
+            } else if (verifyPoint(img, nextPoint.x, nextPoint.y+1)) {
+                nextPoint.y+=1;
+                edge.add(new Point(nextPoint));
+            } else {
+                IJ.showMessage("Error", "Unable to recognize srtucture");
+                return;
+            }
+
+            while (!nextPoint.equals(p_r)) {
+
+                if (verifyPoint(img, nextPoint.x-1, nextPoint.y) && !isPrevious(edge.get(edge.size()-2), nextPoint.x-1, nextPoint.y)) {
+                    nextPoint.x -= 1;
+                    edge.add(new Point(nextPoint));
+                }
+
+                else if (verifyPoint(img, nextPoint.x, nextPoint.y-1) && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y-1)) {
+                    nextPoint.y -= 1;
+                    edge.add(new Point(nextPoint));
+                }
+
+                else if (verifyPoint(img, nextPoint.x+1, nextPoint.y) && !isPrevious(edge.get(edge.size()-2), nextPoint.x+1, nextPoint.y)) {
+                    nextPoint.x += 1;
+                    edge.add(new Point(nextPoint));
+                }
+
+                else if (verifyPoint(img, nextPoint.x, nextPoint.y+1) && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y+1)) {
+                    nextPoint.y += 1;
+                    edge.add(new Point(nextPoint));
+                }
+
+                else
+                    break;
+            }
+        }
+
+        for (int i = 0; i < edge.size()/2; i++) {
+            LineSegment line = new LineSegment(edge.get(i).x, edge.get(i).y, edge.get(edge.size()-i-1).x, edge.get(edge.size()-i-1).y);
+            imageProcessor.drawDot((int)line.midPoint().x, (int)line.midPoint().y);
+        }
+
+        String string = "";
+        for (Point p : edge) {
+            imageProcessor.drawDot(p.x, p.y);
+             string+=p.x+","+p.y+";";
+        }
+        //IJ.showMessage(string);
+        //IJ.showMessage("Result Edge", edge.get(edge.size()-1) + "\n" + p_r);
     }
 
+    boolean isPrevious(Point previous, int x, int y) {
+        return (previous.x == x && previous.y == y);
+    }
 
     //public for testing
     /**
@@ -252,6 +328,10 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
     public boolean verifyPoint(ImagePlus imp, Point point) {
         return imageProcessor.getPixel(point.x, point.y) > 0;
+    }
+
+    public boolean verifyPoint(ImagePlus imp, int x, int y) {
+        return imageProcessor.getPixel(x, y) > 0;
     }
 
 
