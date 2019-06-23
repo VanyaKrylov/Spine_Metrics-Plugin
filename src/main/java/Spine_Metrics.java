@@ -3,6 +3,7 @@ import ij.ImagePlus;
 import ij.WindowManager;
 import ij.gui.ImageCanvas;
 import ij.gui.ImageWindow;
+import ij.plugin.PointToolOptions;
 import ij.plugin.filter.Convolver;
 import ij.plugin.filter.Filters;
 import ij.plugin.frame.PlugInFrame;
@@ -42,14 +43,24 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
             win = img.getWindow();
             canvas = win.getCanvas();
             imageProcessor = img.getProcessor();
-            imageProcessor.setColor(Color.red);
+            imageProcessor.setColor(128);
             Convolver cv = new Convolver();
             cv.setNormalize(false);
-            float[] H = { -0.125f, -0.125f, -0.125f,
+            float[] K = { -0.125f, -0.125f, -0.125f,
                           -0.125f,    1.0f,    -0.125f,
                           -0.125f, -0.125f, -0.125f };
-            cv.convolve(imageProcessor, H, 3, 3);
-            IJ.setThreshold(1, 255, "Black & White");
+            cv.convolve(imageProcessor, K, 3, 3);
+            IJ.setThreshold(0, 255, "Over/Under");
+            //IJ.setThreshold(1, 255);
+            int H = img.getHeight();
+            int W  = img.getWidth();
+            for (int i = 0; i < H; i++) {
+                for (int j = 0; j < W; j++) {
+                    if (imageProcessor.get(i,j) > 0)
+                        imageProcessor.set(i,j,255);
+                }
+            }
+            canvas.imageUpdate(img.getImage(), 32, 0, 0, W, H);
             prevImgHash = img.hashCode();
             toFindEdges = true;
             p_l = p_c = p_r = nullPoint;
@@ -60,6 +71,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         }
     }
 
+    //PointToolOptions
 
     public Point getP_l() {
         return p_l;
@@ -72,7 +84,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
     public Point getP_r() {
         return p_r;
     }
-
 
     /**
      * Need improve, the current logic works only if you follow the order of clicking:
@@ -87,6 +98,28 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         int x = canvas.offScreenX(e.getX());
         int y = canvas.offScreenY(e.getY());
         img = canvas.getImage();
+
+        p = new Point(x,y);
+        if (verifyPoint(img, p)) {
+            imageProcessor.drawDot(p.x, p.y);
+            if (p_l.equals(nullPoint))
+                p_l = p;
+            else {
+                if (isBaseLineHorizontal(p_l.x, p_l.y, p.x, p.y)) {
+                    if (p.x < p_l.x) {
+                        p_r = p_l;
+                        p_l = p;
+                    }
+                } else if (p.y < p_l.y) {
+                    p_r = p_l;
+                    p_l = p;
+                }
+                process2(img);
+            }
+        } else {
+            IJ.showMessage("Wrong Input", "Can't choose background pixels");
+        }
+
 
             //img = WindowManager.getCurrentImage();
 
@@ -139,11 +172,21 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 }
             } else
                 IJ.showMessage("Wrong Input", "Can't choose background pixels");
-                
+
              */
 
     }
 
+
+    boolean isBaseLineHorizontal(int x0, int y0, int x1, int y1) {
+        if (y0 == y1) return true;
+        return (Math.abs(x1-x0)/Math.abs(y1-y0) >= 1);
+    }
+
+
+    void process2(ImagePlus img) {
+
+    }
 
 
     //public for testing
