@@ -124,8 +124,10 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
     void process2(ImagePlus img) {
         Point nextPoint = p_l;
         ArrayList<Point> edge = new ArrayList<>();
+        ArrayList<Point> resEdge = new ArrayList<>();
         edge.add(new Point(p_l));
         boolean isMovingUp = false;
+        boolean isMovingLeft = false;
         if (baseLineOrientation == 0) {
 
             while (verifyPoint(img, nextPoint.x+1, nextPoint.y)) {
@@ -144,59 +146,35 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 IJ.showMessage("Error", "Unable to recognize srtucture");
                 return;
             }
-
-            while (!nextPoint.equals(p_r)) {
-
-                /**LEFT*/
-                if (verifyPoint(img, nextPoint.x-1, nextPoint.y)
-                        && !isPrevious(edge.get(edge.size()-2), nextPoint.x-1, nextPoint.y)
-                        && !isSingle4Neighboured(nextPoint.x-1, nextPoint.y)) {
-                    nextPoint.x -= 1;
-                    edge.add(new Point(nextPoint));
-                }
-
-                /**UP*/
-                else if (verifyPoint(img, nextPoint.x, nextPoint.y-1)
-                        && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y-1)
-                        && !isSingle4Neighboured(nextPoint.x, nextPoint.y-1)) {
-                    if (verifyPoint(img, nextPoint.x, nextPoint.y+1) && !isMovingUp)
-                        nextPoint.y += 1;
-                    else {
-                        nextPoint.y -= 1;
-                        isMovingUp = true;
-                    }
-                    edge.add(new Point(nextPoint));
-                }
-
-                /**RIGHT*/
-                else if (verifyPoint(img, nextPoint.x+1, nextPoint.y)
-                        && !isPrevious(edge.get(edge.size()-2), nextPoint.x+1, nextPoint.y)
-                        && !isSingle4Neighboured(nextPoint.x+1, nextPoint.y)) {
-                    nextPoint.x += 1;
-                    edge.add(new Point(nextPoint));
-                }
-
-                /**DOWN*/
-                else if (verifyPoint(img, nextPoint.x, nextPoint.y+1)
-                        && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y+1)
-                        && !isSingle4Neighboured(nextPoint.x, nextPoint.y+1)) {
-                    isMovingUp=false;
-                    nextPoint.y += 1;
-                    edge.add(new Point(nextPoint));
-                }
-                else
-                    break;
+            resEdge = parseEdge(img, nextPoint, edge, isMovingUp, isMovingLeft);
+        } else {
+            while (verifyPoint(img, nextPoint.x, nextPoint.y+1)) {
+                nextPoint.y+=1;
+                edge.add(new Point(nextPoint));
             }
+
+            if (verifyPoint(img, nextPoint.x-1, nextPoint.y)) {
+                nextPoint.x-=1;
+                isMovingLeft = true;
+                edge.add(new Point(nextPoint));
+            } else if (verifyPoint(img, nextPoint.x+1, nextPoint.y)) {
+                nextPoint.x+=1;
+                edge.add(new Point(nextPoint));
+            } else {
+                IJ.showMessage("Error", "Unable to recognize srtucture");
+                return;
+            }
+            resEdge = parseEdge(img, nextPoint, edge, isMovingUp, isMovingLeft);
         }
 
-        int[] xp = new int[edge.size()/2 + 1];
-        int[] yp = new int[edge.size()/2 + 1];
+        int[] xp = new int[resEdge.size()/2 + 1];
+        int[] yp = new int[resEdge.size()/2 + 1];
         int nPoints = 0;
-        LineSegment maxLine = new LineSegment(p_l.x, p_l.y, p_r.x, p_r.y);
+        LineSegment maxLine = new LineSegment(edge.get(0).x, edge.get(0).y, edge.get(edge.size()-1).x, edge.get(edge.size()-1).y);
         boolean isNewMax = false;
-        for (int i = 0; i < edge.size()/2; i++) {
-            LineSegment line = new LineSegment(edge.get(i).x, edge.get(i).y, edge.get(edge.size()-i-1).x, edge.get(edge.size()-i-1).y);
-            if (line.getLength() > maxLine.getLength()) {
+        for (int i = 0; i < resEdge.size()/2; i++) {
+            LineSegment line = new LineSegment(resEdge.get(i).x, resEdge.get(i).y, resEdge.get(resEdge.size()-i-1).x, resEdge.get(resEdge.size()-i-1).y);
+            if (line.getLength() > maxLine.getLength()+2) {
                 maxLine = line;
                 isNewMax = true;
             }
@@ -210,7 +188,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         imageProcessor.drawRoi(maxPolyLine);
 
         String string = "";
-        for (Point p : edge) {
+        for (Point p : resEdge) {
             imageProcessor.drawDot(p.x, p.y);
         }
 
@@ -221,6 +199,58 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         else
             string = "Penek spine";
         IJ.showMessage("Result", string);
+    }
+
+    private ArrayList<Point> parseEdge(ImagePlus img, Point nextPoint, ArrayList<Point> edge, boolean isMovingUp, boolean isMovingLeft) {
+        while (!nextPoint.equals(p_r)) {
+
+            /**LEFT*/
+            if (verifyPoint(img, nextPoint.x-1, nextPoint.y)
+                    && !isPrevious(edge.get(edge.size()-2), nextPoint.x-1, nextPoint.y)
+                    && !isSingle4Neighboured(nextPoint.x-1, nextPoint.y)) {
+                if (verifyPoint(img, nextPoint.x+1, nextPoint.y) && !isMovingLeft)
+                    nextPoint.x += 1;
+                else {
+                    nextPoint.x -= 1;
+                    isMovingLeft = true;
+                }
+                edge.add(new Point(nextPoint));
+            }
+
+            /**UP*/
+            else if (verifyPoint(img, nextPoint.x, nextPoint.y-1)
+                    && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y-1)
+                    && !isSingle4Neighboured(nextPoint.x, nextPoint.y-1)) {
+                if (verifyPoint(img, nextPoint.x, nextPoint.y+1) && !isMovingUp )
+                    nextPoint.y += 1;
+                else {
+                    nextPoint.y -= 1;
+                    isMovingUp = true;
+                }
+                edge.add(new Point(nextPoint));
+            }
+
+            /**RIGHT*/
+            else if (verifyPoint(img, nextPoint.x+1, nextPoint.y)
+                    && !isPrevious(edge.get(edge.size()-2), nextPoint.x+1, nextPoint.y)
+                    && !isSingle4Neighboured(nextPoint.x+1, nextPoint.y)) {
+                nextPoint.x += 1;
+                isMovingLeft = false;
+                edge.add(new Point(nextPoint));
+            }
+
+            /**DOWN*/
+            else if (verifyPoint(img, nextPoint.x, nextPoint.y+1)
+                    && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y+1)
+                    && !isSingle4Neighboured(nextPoint.x, nextPoint.y+1)) {
+                isMovingUp=false;
+                nextPoint.y += 1;
+                edge.add(new Point(nextPoint));
+            }
+            else
+                break;
+        }
+        return edge;
     }
 
     boolean isPrevious(Point previous, int x, int y) {
