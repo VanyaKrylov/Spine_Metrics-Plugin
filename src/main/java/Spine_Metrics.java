@@ -1,8 +1,7 @@
 import ij.IJ;
 import ij.ImagePlus;
 import ij.WindowManager;
-import ij.gui.ImageCanvas;
-import ij.gui.ImageWindow;
+import ij.gui.*;
 import ij.plugin.PointToolOptions;
 import ij.plugin.filter.Binary;
 import ij.plugin.filter.Convolver;
@@ -222,22 +221,35 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
             while (!nextPoint.equals(p_r)) {
 
-                if (verifyPoint(img, nextPoint.x-1, nextPoint.y) && !isPrevious(edge.get(edge.size()-2), nextPoint.x-1, nextPoint.y)) {
+                /**LEFT*/
+                if (verifyPoint(img, nextPoint.x-1, nextPoint.y)
+                        && !isPrevious(edge.get(edge.size()-2), nextPoint.x-1, nextPoint.y)
+                        && !isSingle4Neighboured(nextPoint.x-1, nextPoint.y)) {
+                    
                     nextPoint.x -= 1;
                     edge.add(new Point(nextPoint));
                 }
 
-                else if (verifyPoint(img, nextPoint.x, nextPoint.y-1) && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y-1)) {
+                /**UP*/
+                else if (verifyPoint(img, nextPoint.x, nextPoint.y-1)
+                        && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y-1)
+                        && !isSingle4Neighboured(nextPoint.x, nextPoint.y-1)) {
                     nextPoint.y -= 1;
                     edge.add(new Point(nextPoint));
                 }
 
-                else if (verifyPoint(img, nextPoint.x+1, nextPoint.y) && !isPrevious(edge.get(edge.size()-2), nextPoint.x+1, nextPoint.y)) {
+                /**RIGHT*/
+                else if (verifyPoint(img, nextPoint.x+1, nextPoint.y)
+                        && !isPrevious(edge.get(edge.size()-2), nextPoint.x+1, nextPoint.y)
+                        && !isSingle4Neighboured(nextPoint.x+1, nextPoint.y)) {
                     nextPoint.x += 1;
                     edge.add(new Point(nextPoint));
                 }
 
-                else if (verifyPoint(img, nextPoint.x, nextPoint.y+1) && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y+1)) {
+                /**DOWN*/
+                else if (verifyPoint(img, nextPoint.x, nextPoint.y+1)
+                        && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y+1)
+                        && !isSingle4Neighboured(nextPoint.x, nextPoint.y+1)) {
                     nextPoint.y += 1;
                     edge.add(new Point(nextPoint));
                 }
@@ -247,22 +259,45 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
             }
         }
 
+        int[] xp = new int[edge.size()/2 + 1];
+        int[] yp = new int[edge.size()/2 + 1];
+        int nPoints = 0;
         for (int i = 0; i < edge.size()/2; i++) {
             LineSegment line = new LineSegment(edge.get(i).x, edge.get(i).y, edge.get(edge.size()-i-1).x, edge.get(edge.size()-i-1).y);
-            imageProcessor.drawDot((int)line.midPoint().x, (int)line.midPoint().y);
+            //imageProcessor.drawDot((int)line.midPoint().x, (int)line.midPoint().y);
+            xp[i] = (int)line.midPoint().x;
+            yp[i] = (int)line.midPoint().y;
+            nPoints++;
         }
+        PolygonRoi skeleton = new PolygonRoi(xp, yp, nPoints, Roi.POLYLINE);
+        imageProcessor.drawRoi(skeleton);
 
         String string = "";
         for (Point p : edge) {
             imageProcessor.drawDot(p.x, p.y);
              string+=p.x+","+p.y+";";
         }
+
+        p_l = p_r = nullPoint;
         //IJ.showMessage(string);
         //IJ.showMessage("Result Edge", edge.get(edge.size()-1) + "\n" + p_r);
     }
 
     boolean isPrevious(Point previous, int x, int y) {
         return (previous.x == x && previous.y == y);
+    }
+
+    boolean isSingle4Neighboured(int x, int y) {
+        int count = 0;
+        if (verifyPoint(img,x-1,y))
+            count++;
+        if (verifyPoint(img,x+1,y))
+            count++;
+        if (verifyPoint(img,x,y-1))
+            count++;
+        if (verifyPoint(img,x,y+1))
+            count++;
+        return count <= 1;
     }
 
     //public for testing
