@@ -2,24 +2,15 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.WindowManager;
 import ij.gui.*;
-import ij.plugin.PointToolOptions;
-import ij.plugin.filter.Binary;
 import ij.plugin.filter.Convolver;
-import ij.plugin.filter.Filters;
 import ij.plugin.frame.PlugInFrame;
-import ij.plugin.frame.ThresholdAdjuster;
-import ij.process.BinaryProcessor;
-import ij.process.Blitter;
-import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.LineSegment;
-
 import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.util.ArrayList;
-import java.util.Optional;
 
 public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
@@ -27,16 +18,10 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
     private static Frame instance;
     private ImagePlus img;
     private ImageWindow win;
-    private ImageProcessor imageProcessor;
-    private boolean toFindEdges;
+    private ImageProcessor imageProcessor;;
     private int baseLineOrientation; /**Horizontal = 0, Vertival = 1 */
-
     private static final Point nullPoint = new Point(-1, -1);
-
-    private int maxDistanceToBaselineEnd = 5;
-
     private Point p_l, p_r, p_c;
-    //private Optional<Point> p_l, p_r, p_c;
     private int prevImgHash;
 
     public Spine_Metrics() {
@@ -57,7 +42,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                           -0.125f, -0.125f, -0.125f };
             cv.convolve(imageProcessor, K, 3, 3);
             IJ.setThreshold(0, 255, "Over/Under");
-            //IJ.setThreshold(1, 255);
             int H = img.getHeight();
             int W  = img.getWidth();
             for (int i = 0; i < H; i++) {
@@ -66,15 +50,13 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                         imageProcessor.set(i,j,255);
                 }
             }
-            IJ.run(img2, "Skeletonize (2D/3D)", "");
 
+            //IJ.run(img2, "Skeletonize (2D/3D)", "");
             //imageProcessor.copyBits(img2.getProcessor(), 0, 0, Blitter.MAX);
 
             canvas.imageUpdate(img.getImage(), 32, 0, 0, W, H);
             prevImgHash = img.hashCode();
-            toFindEdges = true;
             p_l = p_c = p_r = nullPoint;
-            //p_l = p_c = p_r = Optional.empty();
             canvas.addMouseListener(this);
         } catch (Exception e) {
             IJ.showMessage("Error", e.getStackTrace().toString());
@@ -130,62 +112,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         } else {
             IJ.showMessage("Wrong Input", "Can't choose background pixels");
         }
-
-
-            //img = WindowManager.getCurrentImage();
-
-        /*if (prevImgHash != img.hashCode()) {
-            prevImgHash = img.hashCode();
-            p_l = nullPoint;
-            p_c = nullPoint;
-            p_r = nullPoint;
-
-        }*/
-
-            /*p = (verifyPoint(img, new Point(x, y))) ?
-                    new Point(x, y) :
-                    autoCorrectPoint(img, new Point(x, y));
-
-            if (!p.equals(nullPoint)) {
-                if (p_l.equals(nullPoint)) {
-                    p_l = p;
-                    imageProcessor.drawDot(p_l.x, p_l.y);
-                } else if (p_r.equals(nullPoint)) {
-                    p_r = p;
-                    if (!verifyBasePoints(img, p_l, p_r)) {
-                        IJ.showMessage("Wrong Input", "Error, the length of the base line is too big\n Discarding previous input");
-                        p_l = nullPoint;
-                        p_r = nullPoint;
-                    } else {
-                        imageProcessor.drawLine(p_l.x, p_l.y, p_r.x, p_r.y);
-                        img.updateImage();
-
-                        //new logic for edges
-                        process(img);
-
-                        p_l = nullPoint;
-                        p_c = nullPoint;
-                        p_r = nullPoint;
-                    }
-                } /* else if (p_c.equals(nullPoint)) {
-                    p_c = p;
-                    imageProcessor.drawDot(p_c.x, p_c.y);
-                    //IJ.showMessage(" p_l = " + p_l.x + " " + p_l.y + " p_r = " + p_r.x + " " + p_r.y + " p_c = " + p_c.x + " " + p_c.y);
-                    process(img);
-
-                    p_l = nullPoint;
-                    p_c = nullPoint;
-                    p_r = nullPoint;
-                }  else {
-                    e.consume();
-                    //process(img);
-                    //IJ.showMessage(" p_l = " + p_l.toString() + " p_r = " + p_r.toString() + " p_c = " + p_c.toString());
-                }
-            } else
-                IJ.showMessage("Wrong Input", "Can't choose background pixels");
-
-             */
-
     }
 
 
@@ -196,18 +122,15 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
 
     void process2(ImagePlus img) {
-        //imageProcessor.setColor(226);
         Point nextPoint = p_l;
         ArrayList<Point> edge = new ArrayList<>();
         edge.add(new Point(p_l));
         boolean isMovingUp = false;
-        //int arrayPad = 1;
         if (baseLineOrientation == 0) {
 
             while (verifyPoint(img, nextPoint.x+1, nextPoint.y)) {
                 nextPoint.x += 1;
                 edge.add(new Point(nextPoint));
-                //if (arrayPad > 0) arrayPad--;
             }
 
             if (verifyPoint(img, nextPoint.x, nextPoint.y-1)) {
@@ -228,20 +151,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 if (verifyPoint(img, nextPoint.x-1, nextPoint.y)
                         && !isPrevious(edge.get(edge.size()-2), nextPoint.x-1, nextPoint.y)
                         && !isSingle4Neighboured(nextPoint.x-1, nextPoint.y)) {
-                    /*if (nextPoint.x-1 == p_r.x && nextPoint.y == p_r.y)
-                        nextPoint = p_r;
-                    else if (verifyPoint(img, nextPoint.x, nextPoint.y+1)) {
-                        if (nextPoint.y+1 < p_r.y && (Math.abs(p_l.x - nextPoint.x) > Math.abs(p_r.x - nextPoint.x)) )
-                            nextPoint.y += 1;
-                        else
-                            nextPoint.x -= 1;
-                    } else if (verifyPoint(img, nextPoint.x, nextPoint.y-1)) {
-                        if (nextPoint.y-1 > p_r.y && (Math.abs(p_l.x - nextPoint.x) > Math.abs(p_r.x - nextPoint.x)))
-                            nextPoint.y -= 1;
-                        else
-                            nextPoint.x -= 1;
-                    } else
-                     */
                     nextPoint.x -= 1;
                     edge.add(new Point(nextPoint));
                 }
@@ -250,15 +159,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 else if (verifyPoint(img, nextPoint.x, nextPoint.y-1)
                         && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y-1)
                         && !isSingle4Neighboured(nextPoint.x, nextPoint.y-1)) {
-                    /*if (nextPoint.x == p_r.x && nextPoint.y-1 == p_r.y)
-                        nextPoint = p_r;
-                    else if (verifyPoint(img, nextPoint.x+1, nextPoint.y)) {
-                        if (nextPoint.y > p_r.y && (Math.abs(p_l.x+1 - nextPoint.x) > Math.abs(p_r.x+1 - nextPoint.x)) )
-                            nextPoint.y += 1;
-                        else
-                            nextPoint.x -= 1;
-                    } else
-                     */
                     if (verifyPoint(img, nextPoint.x, nextPoint.y+1) && !isMovingUp)
                         nextPoint.y += 1;
                     else {
@@ -284,7 +184,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                     nextPoint.y += 1;
                     edge.add(new Point(nextPoint));
                 }
-
                 else
                     break;
             }
@@ -301,27 +200,18 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 maxLine = line;
                 isNewMax = true;
             }
-            //imageProcessor.drawDot((int)line.midPoint().x, (int)line.midPoint().y);
             xp[i] = (int)line.midPoint().x;
             yp[i] = (int)line.midPoint().y;
             nPoints++;
         }
         PolygonRoi skeleton = new PolygonRoi(xp, yp, nPoints, Roi.POLYLINE);
-        int[] xp2 = new int[2];
-        int[] yp2 = new int[2];
-        xp2[0] = (int)maxLine.p0.x;
-        xp2[1] = (int)maxLine.p1.x;
-        yp2[0] = (int)maxLine.p0.y;
-        yp2[1] = (int)maxLine.p1.y;
-        PolygonRoi maxPolyLine = new PolygonRoi(xp2, yp2, 2, Roi.POLYLINE);
+        PolygonRoi maxPolyLine = new PolygonRoi(new int[]{(int)maxLine.p0.x, (int)maxLine.p1.x}, new int[]{(int)maxLine.p0.y, (int)maxLine.p1.y}, 2, Roi.POLYLINE);
         imageProcessor.drawRoi(skeleton);
         imageProcessor.drawRoi(maxPolyLine);
-        //imageProcessor.drawLine((int)maxLine.p0.x, (int)maxLine.p0.y, (int)maxLine.p1.x, (int)maxLine.p1.y);
 
         String string = "";
         for (Point p : edge) {
             imageProcessor.drawDot(p.x, p.y);
-             string+=p.x+","+p.y+";";
         }
 
         p_l = p_r = nullPoint;
@@ -331,8 +221,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         else
             string = "Penek spine";
         IJ.showMessage("Result", string);
-        //IJ.showMessage(string);
-        //IJ.showMessage("Result Edge", edge.get(edge.size()-1) + "\n" + p_r);
     }
 
     boolean isPrevious(Point previous, int x, int y) {
@@ -352,66 +240,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         return count <= 1;
     }
 
-    //public for testing
-    /**
-     * Spine metrics processing
-     * @param imp
-     * @return
-     */
-    public int process(ImagePlus imp) {
-
-        Coordinate baseLeftBoundary = new Coordinate(p_l.x, p_l.y),baseRightBoundary = new Coordinate(p_r.x, p_r.y);
-        LineSegment baseLine = new LineSegment(baseLeftBoundary, baseRightBoundary);
-        Coordinate spineCenter = new Coordinate(p_c.x, p_c.y);
-        Coordinate perpendPointProj = baseLine.closestPoint(spineCenter);
-
-        imageProcessor.drawLine((int)perpendPointProj.x, (int)perpendPointProj.y, (int)spineCenter.x, (int)spineCenter.y);
-
-        int offset = ( perpendPointProj.y < spineCenter.y ) ? 1 : -1;
-
-/*
-        Coordinate midPoint = baseLine.midPoint();
-        LineSegment spineLine = baseLine;
-        while ( verifyCoordinate(imp, midPoint = spineLine.pointAlongOffset(spineLine.getLength()/2, offset)) ) {
-            while (  )
-        } */
-
-        LineSegment perpendicularToBase = new LineSegment(spineCenter, perpendPointProj);
-        Coordinate startLeft = baseLine.pointAlongOffset(0, offset);
-        Coordinate endLeft = baseLine.pointAlongOffset(1, offset);
-        //LineString spineSkeletonLine = new GeometryFactory().createLineString(new Coordinate[]{startLeft, endLeft});
-        LineSegment spineSkeletonLine = new LineSegment(startLeft, endLeft);
-
-        return 0;
-
-    }
-
-
-
-    public boolean verifyBasePoints(ImagePlus imp, Point left_p, Point right_p) {
-        Coordinate baseLeftBoundary = new Coordinate(left_p.x, left_p.y),
-                   baseRightBoundary = new Coordinate(right_p.x, right_p.y);
-
-        LineSegment baseLine = new LineSegment(baseLeftBoundary, baseRightBoundary);
-        int i = 0;
-
-        if ( baseLine.getLength() > 40 )
-            return false;
-
-        while ( verifyPoint(imp, new Point((int) baseLeftBoundary.x, (int) baseLeftBoundary.y))
-                &&
-                verifyPoint(imp, new Point((int) baseRightBoundary.x, (int) baseRightBoundary.y)) ) {
-            i++;
-            baseLeftBoundary = baseLine.pointAlong(- i/baseLine.getLength());
-            baseRightBoundary = baseLine.pointAlong(1 + i/baseLine.getLength());
-            if ( i > maxDistanceToBaselineEnd*2 ) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-
 
     public boolean verifyPoint(ImagePlus imp, Point point) {
         return imageProcessor.getPixel(point.x, point.y) > 0;
@@ -420,13 +248,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
     public boolean verifyPoint(ImagePlus imp, int x, int y) {
         return imageProcessor.getPixel(x, y) > 0;
     }
-
-
-    public boolean verifyCoordinate(ImagePlus imp, Coordinate coordinate) {
-        return imageProcessor.getPixel((int) coordinate.x, (int) coordinate.y) > 0;
-
-    }
-
 
     public Point autoCorrectPoint(ImagePlus imp, Point point) {
         int x = 6, y = 6;
