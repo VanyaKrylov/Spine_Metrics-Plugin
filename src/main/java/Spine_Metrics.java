@@ -210,6 +210,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
             if (verifyPoint(img, nextPoint.x, nextPoint.y-1)) {
                 nextPoint.y -= 1;
+                isMovingUp = true;
                 edge.add(new Point(nextPoint));
             } else if (verifyPoint(img, nextPoint.x, nextPoint.y+1)) {
                 nextPoint.y+=1;
@@ -225,7 +226,20 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 if (verifyPoint(img, nextPoint.x-1, nextPoint.y)
                         && !isPrevious(edge.get(edge.size()-2), nextPoint.x-1, nextPoint.y)
                         && !isSingle4Neighboured(nextPoint.x-1, nextPoint.y)) {
-                    
+                    /*if (nextPoint.x-1 == p_r.x && nextPoint.y == p_r.y)
+                        nextPoint = p_r;
+                    else if (verifyPoint(img, nextPoint.x, nextPoint.y+1)) {
+                        if (nextPoint.y+1 < p_r.y && (Math.abs(p_l.x - nextPoint.x) > Math.abs(p_r.x - nextPoint.x)) )
+                            nextPoint.y += 1;
+                        else
+                            nextPoint.x -= 1;
+                    } else if (verifyPoint(img, nextPoint.x, nextPoint.y-1)) {
+                        if (nextPoint.y-1 > p_r.y && (Math.abs(p_l.x - nextPoint.x) > Math.abs(p_r.x - nextPoint.x)))
+                            nextPoint.y -= 1;
+                        else
+                            nextPoint.x -= 1;
+                    } else
+                     */
                     nextPoint.x -= 1;
                     edge.add(new Point(nextPoint));
                 }
@@ -234,7 +248,21 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 else if (verifyPoint(img, nextPoint.x, nextPoint.y-1)
                         && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y-1)
                         && !isSingle4Neighboured(nextPoint.x, nextPoint.y-1)) {
-                    nextPoint.y -= 1;
+                    /*if (nextPoint.x == p_r.x && nextPoint.y-1 == p_r.y)
+                        nextPoint = p_r;
+                    else if (verifyPoint(img, nextPoint.x+1, nextPoint.y)) {
+                        if (nextPoint.y > p_r.y && (Math.abs(p_l.x+1 - nextPoint.x) > Math.abs(p_r.x+1 - nextPoint.x)) )
+                            nextPoint.y += 1;
+                        else
+                            nextPoint.x -= 1;
+                    } else
+                     */
+                    if (verifyPoint(img, nextPoint.x, nextPoint.y+1) && !isMovingUp)
+                        nextPoint.y += 1;
+                    else {
+                        nextPoint.y -= 1;
+                        isMovingUp = true;
+                    }
                     edge.add(new Point(nextPoint));
                 }
 
@@ -250,6 +278,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 else if (verifyPoint(img, nextPoint.x, nextPoint.y+1)
                         && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y+1)
                         && !isSingle4Neighboured(nextPoint.x, nextPoint.y+1)) {
+                    isMovingUp=false;
                     nextPoint.y += 1;
                     edge.add(new Point(nextPoint));
                 }
