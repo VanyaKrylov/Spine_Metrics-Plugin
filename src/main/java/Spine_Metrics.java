@@ -100,6 +100,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
      */
     @Override
     public void mouseClicked(MouseEvent e) {
+        imageProcessor.setColor(128);
         Point p = nullPoint;
         int x = canvas.offScreenX(e.getX());
         int y = canvas.offScreenY(e.getY());
@@ -195,6 +196,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
 
     void process2(ImagePlus img) {
+        //imageProcessor.setColor(226);
         Point nextPoint = p_l;
         ArrayList<Point> edge = new ArrayList<>();
         edge.add(new Point(p_l));
@@ -291,15 +293,30 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         int[] xp = new int[edge.size()/2 + 1];
         int[] yp = new int[edge.size()/2 + 1];
         int nPoints = 0;
+        LineSegment maxLine = new LineSegment(p_l.x, p_l.y, p_r.x, p_r.y);
+        boolean isNewMax = false;
         for (int i = 0; i < edge.size()/2; i++) {
             LineSegment line = new LineSegment(edge.get(i).x, edge.get(i).y, edge.get(edge.size()-i-1).x, edge.get(edge.size()-i-1).y);
+            if (line.getLength() > maxLine.getLength()) {
+                maxLine = line;
+                isNewMax = true;
+            }
             //imageProcessor.drawDot((int)line.midPoint().x, (int)line.midPoint().y);
             xp[i] = (int)line.midPoint().x;
             yp[i] = (int)line.midPoint().y;
             nPoints++;
         }
         PolygonRoi skeleton = new PolygonRoi(xp, yp, nPoints, Roi.POLYLINE);
+        int[] xp2 = new int[2];
+        int[] yp2 = new int[2];
+        xp2[0] = (int)maxLine.p0.x;
+        xp2[1] = (int)maxLine.p1.x;
+        yp2[0] = (int)maxLine.p0.y;
+        yp2[1] = (int)maxLine.p1.y;
+        PolygonRoi maxPolyLine = new PolygonRoi(xp2, yp2, 2, Roi.POLYLINE);
         imageProcessor.drawRoi(skeleton);
+        imageProcessor.drawRoi(maxPolyLine);
+        //imageProcessor.drawLine((int)maxLine.p0.x, (int)maxLine.p0.y, (int)maxLine.p1.x, (int)maxLine.p1.y);
 
         String string = "";
         for (Point p : edge) {
@@ -308,6 +325,12 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         }
 
         p_l = p_r = nullPoint;
+
+        if (isNewMax)
+            string = "Shroomie spine";
+        else
+            string = "Penek spine";
+        IJ.showMessage("Result", string);
         //IJ.showMessage(string);
         //IJ.showMessage("Result Edge", edge.get(edge.size()-1) + "\n" + p_r);
     }
