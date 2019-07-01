@@ -18,6 +18,7 @@ import java.util.*;
 public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyListener {
 
     Panel panel;
+    Choice modeChoice;
 
     private ImageCanvas canvas;
     private static Frame instance;
@@ -43,6 +44,14 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
             title.setText("Calculating metrics");
             panel.add(title);
             panel.add(new Label());
+
+            Label modeLabel = new Label("Mode");
+            panel.add(modeLabel);
+            panel.add(new Label());
+            modeChoice = new Choice();
+            modeChoice.add("Normal");
+            modeChoice.add("Floating spine");
+            panel.add(modeChoice);
 
             add(panel,BorderLayout.CENTER);
             pack();
@@ -102,11 +111,17 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
      */
     @Override
     public void mouseClicked(MouseEvent e) {
+
+        if (modeChoice.getSelectedItem().equals("Normal")){
+            IJ.showMessage("Norm");
+        }
+
         imageProcessor.setColor(128);
         Point p = nullPoint;
         int x = canvas.offScreenX(e.getX());
         int y = canvas.offScreenY(e.getY());
         img = canvas.getImage();
+        imageProcessor.snapshot();
 
         p = new Point(x,y);
         if (verifyPoint(img, p)) {
@@ -144,7 +159,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
 
 
     void process2(ImagePlus img) {
-        imageProcessor.snapshot();
+        //imageProcessor.snapshot();
         Point nextPoint = p_l;
         Point previous;
         LinkedHashSet<Point> edge = new LinkedHashSet<>();
@@ -255,7 +270,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
             type = "Пеньковый";
         IJ.showMessage("Метрика",
                 "Тип: " + type + "\n" +
-                "Perimetr= " + edge.size() + "\n" +
+                "Perimetr= " + (edge.size()+maxLine.getLength()) + "\n" +
                 "Head Width= " + maxLine.getLength() + "\n" +
                 "Skeleton Length= " + skeleton.size());
     }
