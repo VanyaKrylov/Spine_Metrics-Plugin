@@ -13,7 +13,7 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
-import java.util.ArrayList;
+import java.util.*;
 
 public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyListener {
 
@@ -146,8 +146,10 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
     void process2(ImagePlus img) {
         imageProcessor.snapshot();
         Point nextPoint = p_l;
-        ArrayList<Point> edge = new ArrayList<>();
-        ArrayList<Point> resEdge;
+        Point previous;
+        LinkedHashSet<Point> edge = new LinkedHashSet<>();
+        LinkedHashSet<Point> resEdge;
+        Iterator iterator = edge.iterator();
         edge.add(new Point(p_l));
         boolean isMovingUp = false;
         boolean isMovingLeft = false;
@@ -155,49 +157,77 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
 
             while (verifyPoint(img, nextPoint.x+1, nextPoint.y)) {
                 nextPoint.x += 1;
-                edge.add(new Point(nextPoint));
-                edge.contains()
+                if (!edge.add(new Point(nextPoint))) {
+                    IJ.showMessage("Error", "Unable to parse the edge");
+                    return;
+                }
             }
 
             if (verifyPoint(img, nextPoint.x, nextPoint.y-1)) {
+                previous = new Point(nextPoint);
                 nextPoint.y -= 1;
                 isMovingUp = true;
-                edge.add(new Point(nextPoint));
+                if (!edge.add(new Point(nextPoint))) {
+                    IJ.showMessage("Error", "Unable to parse the edge");
+                    return;
+                }
             } else if (verifyPoint(img, nextPoint.x, nextPoint.y+1)) {
+                previous = new Point(nextPoint);
                 nextPoint.y+=1;
-                edge.add(new Point(nextPoint));
+                if (!edge.add(new Point(nextPoint))) {
+                    IJ.showMessage("Error", "Unable to parse the edge");
+                    return;
+                }
             } else {
                 IJ.showMessage("Error", "Unable to recognize srtucture");
                 return;
             }
-            resEdge = parseEdge(img, nextPoint, edge, isMovingUp, isMovingLeft);
+            resEdge = parseEdge(img, previous, nextPoint, edge, isMovingUp, isMovingLeft);
         } else {
             while (verifyPoint(img, nextPoint.x, nextPoint.y+1)) {
                 nextPoint.y+=1;
-                edge.add(new Point(nextPoint));
+                if (!edge.add(new Point(nextPoint))) {
+                    IJ.showMessage("Error", "Unable to parse the edge");
+                    return;
+                }
             }
 
             if (verifyPoint(img, nextPoint.x-1, nextPoint.y)) {
+                previous = new Point(nextPoint);
                 nextPoint.x-=1;
                 isMovingLeft = true;
-                edge.add(new Point(nextPoint));
+                if (!edge.add(new Point(nextPoint))) {
+                    IJ.showMessage("Error", "Unable to parse the edge");
+                    return;
+                }
             } else if (verifyPoint(img, nextPoint.x+1, nextPoint.y)) {
+                previous = new Point(nextPoint);
                 nextPoint.x+=1;
-                edge.add(new Point(nextPoint));
+                if (!edge.add(new Point(nextPoint))) {
+                    IJ.showMessage("Error", "Unable to parse the edge");
+                    return;
+                }
             } else {
                 IJ.showMessage("Error", "Unable to recognize srtucture");
                 return;
             }
-            resEdge = parseEdge(img, nextPoint, edge, isMovingUp, isMovingLeft);
+            resEdge = parseEdge(img, previous, nextPoint, edge, isMovingUp, isMovingLeft);
+        }
+
+        if (resEdge.isEmpty()) {
+            p_l = p_r = nullPoint;
+            return;
         }
 
         int[] xp = new int[resEdge.size()/2 + 1];
         int[] yp = new int[resEdge.size()/2 + 1];
         int nPoints = 0;
-        LineSegment maxLine = new LineSegment(edge.get(0).x, edge.get(0).y, edge.get(edge.size()-1).x, edge.get(edge.size()-1).y);
+        ArrayList<Point> edgeArray =new ArrayList<>();
+        edgeArray.addAll(resEdge);
+        LineSegment maxLine = new LineSegment(edgeArray.get(0).x, edgeArray.get(0).y, edgeArray.get(edge.size()-1).x, edgeArray.get(edge.size()-1).y);
         boolean isNewMax = false;
         for (int i = 0; i < resEdge.size()/2; i++) {
-            LineSegment line = new LineSegment(resEdge.get(i).x, resEdge.get(i).y, resEdge.get(resEdge.size()-i-1).x, resEdge.get(resEdge.size()-i-1).y);
+            LineSegment line = new LineSegment(edgeArray.get(i).x, edgeArray.get(i).y, edgeArray.get(resEdge.size()-i-1).x, edgeArray.get(resEdge.size()-i-1).y);
             if (line.getLength() > maxLine.getLength()+2) {
                 maxLine = line;
                 isNewMax = true;
@@ -230,51 +260,70 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                 "Skeleton Length= " + skeleton.size());
     }
 
-    private ArrayList<Point> parseEdge(ImagePlus img, Point nextPoint, ArrayList<Point> edge, boolean isMovingUp, boolean isMovingLeft) {
+    private LinkedHashSet<Point> parseEdge(ImagePlus img, Point previous, Point nextPoint, LinkedHashSet<Point> edge, boolean isMovingUp, boolean isMovingLeft) {
         while (!nextPoint.equals(p_r)) {
 
             /**LEFT*/
             if (verifyPoint(img, nextPoint.x-1, nextPoint.y)
-                    && !isPrevious(edge.get(edge.size()-2), nextPoint.x-1, nextPoint.y)
+                    && !isPrevious(previous, nextPoint.x-1, nextPoint.y)
                     && !isSingle4Neighboured(nextPoint.x-1, nextPoint.y)) {
-                if (verifyPoint(img, nextPoint.x+1, nextPoint.y) && !isMovingLeft)
+                if (verifyPoint(img, nextPoint.x+1, nextPoint.y) && !isMovingLeft) {
+                    previous = new Point(nextPoint);
                     nextPoint.x += 1;
-                else {
+                } else {
+                    previous = new Point(nextPoint);
                     nextPoint.x -= 1;
                     isMovingLeft = true;
                 }
-                edge.add(new Point(nextPoint));
+                if (!edge.add(new Point(nextPoint))) {
+                    IJ.showMessage("Error", "Unable to parse the edge");
+                    return new LinkedHashSet<>();
+                }
             }
 
             /**UP*/
             else if (verifyPoint(img, nextPoint.x, nextPoint.y-1)
-                    && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y-1)
+                    && !isPrevious(previous, nextPoint.x, nextPoint.y-1)
                     && !isSingle4Neighboured(nextPoint.x, nextPoint.y-1)) {
-                if (verifyPoint(img, nextPoint.x, nextPoint.y+1) && !isMovingUp )
+                if (verifyPoint(img, nextPoint.x, nextPoint.y+1) && !isMovingUp ) {
+                    previous = new Point(nextPoint);
                     nextPoint.y += 1;
+                }
                 else {
+                    previous = new Point(nextPoint);
                     nextPoint.y -= 1;
                     isMovingUp = true;
                 }
-                edge.add(new Point(nextPoint));
+                if (!edge.add(new Point(nextPoint))) {
+                    IJ.showMessage("Error", "Unable to parse the edge");
+                    return new LinkedHashSet<>();
+                }
             }
 
             /**RIGHT*/
             else if (verifyPoint(img, nextPoint.x+1, nextPoint.y)
-                    && !isPrevious(edge.get(edge.size()-2), nextPoint.x+1, nextPoint.y)
+                    && !isPrevious(previous, nextPoint.x+1, nextPoint.y)
                     && !isSingle4Neighboured(nextPoint.x+1, nextPoint.y)) {
+                previous = new Point(nextPoint);
                 nextPoint.x += 1;
                 isMovingLeft = false;
-                edge.add(new Point(nextPoint));
+                if (!edge.add(new Point(nextPoint))) {
+                    IJ.showMessage("Error", "Unable to parse the edge");
+                    return new LinkedHashSet<>();
+                }
             }
 
             /**DOWN*/
             else if (verifyPoint(img, nextPoint.x, nextPoint.y+1)
-                    && !isPrevious(edge.get(edge.size()-2), nextPoint.x, nextPoint.y+1)
+                    && !isPrevious(previous, nextPoint.x, nextPoint.y+1)
                     && !isSingle4Neighboured(nextPoint.x, nextPoint.y+1)) {
+                previous = new Point(nextPoint);
                 isMovingUp=false;
                 nextPoint.y += 1;
-                edge.add(new Point(nextPoint));
+                if (!edge.add(new Point(nextPoint))) {
+                    IJ.showMessage("Error", "Unable to parse the edge");
+                    return new LinkedHashSet<>();
+                }
             }
             else
                 break;
