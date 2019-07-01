@@ -2,17 +2,22 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.WindowManager;
 import ij.gui.*;
+import ij.plugin.Commands;
 import ij.plugin.filter.Convolver;
 import ij.plugin.frame.PlugInFrame;
 import ij.process.ImageProcessor;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.LineSegment;
 import java.awt.*;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.util.ArrayList;
 
-public class Spine_Metrics extends PlugInFrame implements MouseListener {
+public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyListener {
+
+    Panel panel;
 
     private ImageCanvas canvas;
     private static Frame instance;
@@ -29,6 +34,20 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         instance = this;
 
         try {
+            panel = new Panel();
+            panel.setLayout(new GridLayout(0,3));
+            panel.setBackground(SystemColor.control);
+
+            panel.add(new Label());
+            Label title = new Label();
+            title.setText("Calculating metrics");
+            panel.add(title);
+            panel.add(new Label());
+
+            add(panel,BorderLayout.CENTER);
+            pack();
+            setVisible(true);
+
             img = WindowManager.getCurrentImage();
             ImagePlus img2 = img.duplicate();
             win = img.getWindow();
@@ -40,6 +59,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
             float[] K = { -0.125f, -0.125f, -0.125f,
                           -0.125f,    1.0f,    -0.125f,
                           -0.125f, -0.125f, -0.125f };
+            imageProcessor.snapshot();
             cv.convolve(imageProcessor, K, 3, 3);
             IJ.setThreshold(0, 255, "Over/Under");
             int H = img.getHeight();
@@ -115,6 +135,8 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
     }
 
 
+
+
     boolean isBaseLineHorizontal(int x0, int y0, int x1, int y1) {
         if (y0 == y1) return true;
         return (Math.abs(x1-x0)/Math.abs(y1-y0) >= 1);
@@ -122,9 +144,10 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
 
     void process2(ImagePlus img) {
+        imageProcessor.snapshot();
         Point nextPoint = p_l;
         ArrayList<Point> edge = new ArrayList<>();
-        ArrayList<Point> resEdge = new ArrayList<>();
+        ArrayList<Point> resEdge;
         edge.add(new Point(p_l));
         boolean isMovingUp = false;
         boolean isMovingLeft = false;
@@ -133,6 +156,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
             while (verifyPoint(img, nextPoint.x+1, nextPoint.y)) {
                 nextPoint.x += 1;
                 edge.add(new Point(nextPoint));
+                edge.contains()
             }
 
             if (verifyPoint(img, nextPoint.x, nextPoint.y-1)) {
@@ -194,11 +218,16 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
         p_l = p_r = nullPoint;
 
+        String type = "";
         if (isNewMax)
-            string = "Shroomie spine";
+            type = "Грибовидный";
         else
-            string = "Penek spine";
-        IJ.showMessage("Result", string);
+            type = "Пеньковый";
+        IJ.showMessage("Метрика",
+                "Тип: " + type + "\n" +
+                "Perimetr= " + edge.size() + "\n" +
+                "Head Width= " + maxLine.getLength() + "\n" +
+                "Skeleton Length= " + skeleton.size());
     }
 
     private ArrayList<Point> parseEdge(ImagePlus img, Point nextPoint, ArrayList<Point> edge, boolean isMovingUp, boolean isMovingLeft) {
@@ -321,4 +350,19 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
     @Override
     public void mouseExited(MouseEvent e) {}
+
+    @Override
+    public void keyTyped(KeyEvent e) {
+        IJ.controlKeyDown();
+    }
+
+    @Override
+    public void keyPressed(KeyEvent e) {
+
+    }
+
+    @Override
+    public void keyReleased(KeyEvent e) {
+
+    }
 }
