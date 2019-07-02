@@ -19,6 +19,10 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
 
     Panel panel;
     Choice modeChoice;
+    private static final String NORMAL = "Normal";
+    private static final String FLOATING = "Floating spine";
+    private static final int NORMAL_INT = 0;
+    private static final int FLOATING_INT = 1;
 
     private ImageCanvas canvas;
     private static Frame instance;
@@ -29,6 +33,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
     private static final Point nullPoint = new Point(-1, -1);
     private Point p_l, p_r, p_c;
     private int prevImgHash;
+    private int mode;
 
     public Spine_Metrics() {
         super("Testing");
@@ -49,8 +54,8 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
             panel.add(modeLabel);
             panel.add(new Label());
             modeChoice = new Choice();
-            modeChoice.add("Normal");
-            modeChoice.add("Floating spine");
+            modeChoice.add(NORMAL);
+            modeChoice.add(FLOATING);
             panel.add(modeChoice);
 
             add(panel,BorderLayout.CENTER);
@@ -86,6 +91,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
             canvas.imageUpdate(img.getImage(), 32, 0, 0, W, H);
             prevImgHash = img.hashCode();
             p_l = p_c = p_r = nullPoint;
+            mode = NORMAL_INT;
             canvas.addMouseListener(this);
         } catch (Exception e) {
             IJ.showMessage("Error", e.getStackTrace().toString());
@@ -112,66 +118,97 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
     @Override
     public void mouseClicked(MouseEvent e) {
 
-        if (modeChoice.getSelectedItem().equals("Normal")){
-            IJ.showMessage("Norm");
-        }
-
         imageProcessor.setColor(128);
         Point p = nullPoint;
         int x = canvas.offScreenX(e.getX());
         int y = canvas.offScreenY(e.getY());
+        if (isSingle4Neighboured(x,y)) {
+            IJ.showMessage("Wrong Input", "Can't choose point with a single neighbour");
+            return;
+        }
         img = canvas.getImage();
         imageProcessor.snapshot();
-
         p = new Point(x,y);
-        if (verifyPoint(img, p)) {
-            imageProcessor.drawDot(p.x, p.y);
-            if (p_l.equals(nullPoint))
-                p_l = p;
-            else {
-                baseLineOrientation = 1;
-                if (isBaseLineHorizontal(p_l.x, p_l.y, p.x, p.y)) {
-                    baseLineOrientation = 0;
-                    if (p.x < p_l.x) {
-                        p_r = p_l;
-                        p_l = p;
+
+        if (modeChoice.getSelectedItem().equals(NORMAL)){
+            mode = NORMAL_INT;
+            if (verifyPoint(img, p)) {
+                imageProcessor.drawDot(p.x, p.y);
+                if (p_l.equals(nullPoint))
+                    p_l = new Point(p);
+                else {
+                    baseLineOrientation = 1;
+                    if (isBaseLineHorizontal(p_l.x, p_l.y, p.x, p.y)) {
+                        baseLineOrientation = 0;
+                        if (p.x < p_l.x) {
+                            p_r = new Point(p_l);
+                            p_l = new Point(p);
+                        } else
+                            p_r = new Point(p);
+                    } else if (p.y < p_l.y) {
+                        p_r = new Point(p_l);
+                        p_l = new Point(p);
                     } else
-                        p_r = p;
-                } else if (p.y < p_l.y) {
-                    p_r = p_l;
-                    p_l = p;
-                } else
-                    p_r = p;
-                process2(img);
+                        p_r = new Point(p);
+                    process2(img);
+                }
+            } else {
+                IJ.showMessage("Wrong Input", "Can't choose background pixels");
             }
         } else {
-            IJ.showMessage("Wrong Input", "Can't choose background pixels");
+            mode = FLOATING_INT;
+            if (verifyPoint(img, p)) {
+                imageProcessor.drawDot(p.x, p.y);
+                if (p_l.equals(nullPoint))
+                    p_l = new Point(p);
+                else {
+                    p_c = new Point(p);
+                    process2(img);
+                }
+            }
         }
     }
-
-
-
 
     boolean isBaseLineHorizontal(int x0, int y0, int x1, int y1) {
         if (y0 == y1) return true;
         return (Math.abs(x1-x0)/Math.abs(y1-y0) >= 1);
     }
 
-
     void process2(ImagePlus img) {
         //imageProcessor.snapshot();
-        Point nextPoint = p_l;
+        Point nextPoint;
         Point previous;
         LinkedHashSet<Point> edge = new LinkedHashSet<>();
         LinkedHashSet<Point> resEdge;
-        Iterator iterator = edge.iterator();
         edge.add(new Point(p_l));
         boolean isMovingUp = false;
         boolean isMovingLeft = false;
+
+        if (mode == FLOATING_INT) {
+            if (verifyPoint(img, p_l.x-1, p_l.y)) {
+                p_r = new Point(p_l.x-1, p_l.y);
+                baseLineOrientation = 0;
+            } else if (verifyPoint(img, p_l.x, p_l.y-1)) {
+                p_r = new Point(p_l.x, p_l.y-1);
+                baseLineOrientation = 1;
+            } else if ((!verifyPoint(img, p_l.x-1, p_l.y)) && (!verifyPoint(img, p_l.x, p_l.y-1))) {
+                if (verifyPoint(img, p_l.x+1, p_l.y)) {
+                    p_r = new Point(p_l);
+                    p_l.x+=1;
+                    baseLineOrientation = 0;
+                } else {
+                    IJ.showMessage("Error", "Unable to recognize structure");
+                    return;
+                }
+            }
+        }
+
+        nextPoint = new Point(p_l);
+
         if (baseLineOrientation == 0) {
 
             while (verifyPoint(img, nextPoint.x+1, nextPoint.y)) {
-                nextPoint.x += 1;
+                nextPoint.x+=1;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
                     return;
@@ -180,7 +217,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
 
             if (verifyPoint(img, nextPoint.x, nextPoint.y-1)) {
                 previous = new Point(nextPoint);
-                nextPoint.y -= 1;
+                nextPoint.y-=1;
                 isMovingUp = true;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
@@ -194,7 +231,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                     return;
                 }
             } else {
-                IJ.showMessage("Error", "Unable to recognize srtucture");
+                IJ.showMessage("Error", "Unable to recognize structure");
                 return;
             }
             resEdge = parseEdge(img, previous, nextPoint, edge, isMovingUp, isMovingLeft);
@@ -206,7 +243,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                     return;
                 }
             }
-
             if (verifyPoint(img, nextPoint.x-1, nextPoint.y)) {
                 previous = new Point(nextPoint);
                 nextPoint.x-=1;
