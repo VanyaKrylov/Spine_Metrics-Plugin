@@ -5,6 +5,7 @@ import ij.gui.*;
 import ij.plugin.Commands;
 import ij.plugin.filter.Convolver;
 import ij.plugin.frame.PlugInFrame;
+import ij.plugin.frame.RoiManager;
 import ij.process.ImageProcessor;
 import ij.util.Tools;
 import org.locationtech.jts.algorithm.Distance;
@@ -43,6 +44,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
     public Spine_Metrics() {
         super("Testing");
         instance = this;
+        IJ.setTool(7);
 
         try {
             panel = new Panel();
@@ -137,12 +139,15 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
         img = canvas.getImage();
         imageProcessor.snapshot();
         p = new Point(x,y);
-        pointRoi = new PointRoi(x,y);
+
+        pointRoi = new PointRoi(x,y,img);
+        imageProcessor.setRoi(pointRoi);
+        //pointRoi.draw(img.getImage().getGraphics());
 
         if (modeChoice.getSelectedItem().equals(NORMAL)){
             mode = NORMAL_INT;
             if (verifyPoint(img, p)) {
-                imageProcessor.drawDot(p.x, p.y);
+                //imageProcessor.drawDot(p.x, p.y);
                 if (p_l.equals(nullPoint))
                     p_l = new Point(p);
                 else {
@@ -167,7 +172,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
         } else {
             mode = FLOATING_INT;
             if (verifyPoint(img, p)) {
-                imageProcessor.drawDot(p.x, p.y);
+                //imageProcessor.drawDot(p.x, p.y);
                 if (p_l.equals(nullPoint))
                     p_l = new Point(p);
                 else {
@@ -192,8 +197,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
         edge.add(new Point(p_l));
         boolean isMovingUp = false;
         boolean isMovingLeft = false;
-
-        imageProcessor.drawRoi(pointRoi);
 
         if (mode == FLOATING_INT) {
             if (verifyPoint(img, p_l.x-1, p_l.y)) {
@@ -308,9 +311,13 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
             yp[i] = (int)line.midPoint().y;
             nPoints++;
         }
+        IJ.setTool(5);
         PolygonRoi skeleton = new PolygonRoi(xp, yp, nPoints, Roi.POLYLINE);
         PolygonRoi maxPolyLine = new PolygonRoi(new int[]{(int)maxLine.p0.x, (int)maxLine.p1.x},
                                                 new int[]{(int)maxLine.p0.y, (int)maxLine.p1.y}, 2, Roi.POLYLINE);
+        skeleton.setStrokeColor(Color.WHITE);
+        //maxPolyLine.setStrokeColor(Color.WHITE);
+        imageProcessor.drawLine((int)maxLine.p0.x, (int)maxLine.p0.y, (int)maxLine.p1.x, (int)maxLine.p1.y);
         //imageProcessor.drawRoi(skeleton);
         //imageProcessor.drawRoi(maxPolyLine);
 
@@ -357,6 +364,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                     "Skeleton Length= " + skeleton.size()*scaleValue);
 
         p_l = p_r = p_c = nullPoint;
+        //IJ.setTool(7);
     }
 
     private LinkedHashSet<Point> parseEdge(ImagePlus img, Point previous, Point nextPoint, LinkedHashSet<Point> edge, boolean isMovingUp, boolean isMovingLeft) {
