@@ -6,6 +6,8 @@ import ij.plugin.Commands;
 import ij.plugin.filter.Convolver;
 import ij.plugin.frame.PlugInFrame;
 import ij.process.ImageProcessor;
+import ij.util.Tools;
+import org.locationtech.jts.algorithm.Distance;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.LineSegment;
 import java.awt.*;
@@ -19,6 +21,8 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
 
     Panel panel;
     Choice modeChoice;
+    TextField scaleTextField;
+
     private static final String NORMAL = "Normal";
     private static final String FLOATING = "Floating spine";
     private static final int NORMAL_INT = 0;
@@ -28,7 +32,8 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
     private static Frame instance;
     private ImagePlus img;
     private ImageWindow win;
-    private ImageProcessor imageProcessor;;
+    private ImageProcessor imageProcessor;
+    PointRoi pointRoi;
     private int baseLineOrientation; /**Horizontal = 0, Vertival = 1 */
     private static final Point nullPoint = new Point(-1, -1);
     private Point p_l, p_r, p_c;
@@ -41,22 +46,25 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
 
         try {
             panel = new Panel();
-            panel.setLayout(new GridLayout(0,3));
+            panel.setLayout(new GridLayout(0,2));
             panel.setBackground(SystemColor.control);
 
-            panel.add(new Label());
             Label title = new Label();
             title.setText("Calculating metrics");
             panel.add(title);
             panel.add(new Label());
 
-            Label modeLabel = new Label("Mode");
+            Label modeLabel = new Label("Mode:");
             panel.add(modeLabel);
-            panel.add(new Label());
             modeChoice = new Choice();
             modeChoice.add(NORMAL);
             modeChoice.add(FLOATING);
             panel.add(modeChoice);
+
+            Label scaleLabel = new Label("Scale:");
+            panel.add(scaleLabel);
+            scaleTextField = new TextField(Double.toString(1.0));
+            panel.add(scaleTextField);
 
             add(panel,BorderLayout.CENTER);
             pack();
@@ -129,6 +137,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
         img = canvas.getImage();
         imageProcessor.snapshot();
         p = new Point(x,y);
+        pointRoi = new PointRoi(x,y);
 
         if (modeChoice.getSelectedItem().equals(NORMAL)){
             mode = NORMAL_INT;
@@ -184,6 +193,8 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
         boolean isMovingUp = false;
         boolean isMovingLeft = false;
 
+        imageProcessor.drawRoi(pointRoi);
+
         if (mode == FLOATING_INT) {
             if (verifyPoint(img, p_l.x-1, p_l.y)) {
                 p_r = new Point(p_l.x-1, p_l.y);
@@ -198,6 +209,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                     baseLineOrientation = 0;
                 } else {
                     IJ.showMessage("Error", "Unable to recognize structure");
+                    p_l = p_r = p_c = nullPoint;
                     return;
                 }
             }
@@ -211,6 +223,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                 nextPoint.x+=1;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    p_l = p_r = p_c = nullPoint;
                     return;
                 }
             }
@@ -221,6 +234,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                 isMovingUp = true;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    p_l = p_r = p_c = nullPoint;
                     return;
                 }
             } else if (verifyPoint(img, nextPoint.x, nextPoint.y+1)) {
@@ -228,10 +242,12 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                 nextPoint.y+=1;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    p_l = p_r = p_c = nullPoint;
                     return;
                 }
             } else {
                 IJ.showMessage("Error", "Unable to recognize structure");
+                p_l = p_r = p_c = nullPoint;
                 return;
             }
             resEdge = parseEdge(img, previous, nextPoint, edge, isMovingUp, isMovingLeft);
@@ -240,6 +256,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                 nextPoint.y+=1;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    p_l = p_r = p_c = nullPoint;
                     return;
                 }
             }
@@ -249,6 +266,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                 isMovingLeft = true;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    p_l = p_r = p_c = nullPoint;
                     return;
                 }
             } else if (verifyPoint(img, nextPoint.x+1, nextPoint.y)) {
@@ -256,17 +274,19 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                 nextPoint.x+=1;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    p_l = p_r = p_c = nullPoint;
                     return;
                 }
             } else {
-                IJ.showMessage("Error", "Unable to recognize srtucture");
+                IJ.showMessage("Error", "Unable to recognize structure");
+                p_l = p_r = p_c = nullPoint;
                 return;
             }
             resEdge = parseEdge(img, previous, nextPoint, edge, isMovingUp, isMovingLeft);
         }
 
         if (resEdge.isEmpty()) {
-            p_l = p_r = nullPoint;
+            p_l = p_r = p_c = nullPoint;
             return;
         }
 
@@ -275,6 +295,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
         int nPoints = 0;
         ArrayList<Point> edgeArray =new ArrayList<>();
         edgeArray.addAll(resEdge);
+        LineSegment baseLine = new LineSegment(p_l.x, p_l.y, p_r.x, p_r.y);
         LineSegment maxLine = new LineSegment(edgeArray.get(0).x, edgeArray.get(0).y, edgeArray.get(edge.size()-1).x, edgeArray.get(edge.size()-1).y);
         boolean isNewMax = false;
         for (int i = 0; i < resEdge.size()/2; i++) {
@@ -288,27 +309,54 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
             nPoints++;
         }
         PolygonRoi skeleton = new PolygonRoi(xp, yp, nPoints, Roi.POLYLINE);
-        PolygonRoi maxPolyLine = new PolygonRoi(new int[]{(int)maxLine.p0.x, (int)maxLine.p1.x}, new int[]{(int)maxLine.p0.y, (int)maxLine.p1.y}, 2, Roi.POLYLINE);
-        imageProcessor.drawRoi(skeleton);
-        imageProcessor.drawRoi(maxPolyLine);
+        PolygonRoi maxPolyLine = new PolygonRoi(new int[]{(int)maxLine.p0.x, (int)maxLine.p1.x},
+                                                new int[]{(int)maxLine.p0.y, (int)maxLine.p1.y}, 2, Roi.POLYLINE);
+        //imageProcessor.drawRoi(skeleton);
+        //imageProcessor.drawRoi(maxPolyLine);
+
+        skeleton.draw(img.getImage().getGraphics());
+        maxPolyLine.draw(img.getImage().getGraphics());
+
+        LineSegment neck;
+        if (mode == FLOATING_INT) {
+            //neck = new LineSegment(p_c.x, p_c.y, p_l.x, p_l.y);
+            //PolygonRoi neckLine = new PolygonRoi(new int[]{(int) neck.p0.x, (int) neck.p1.x},
+                    //new int[]{(int) neck.p0.y, (int) neck.p1.y}, 2, Roi.POLYLINE);
+            imageProcessor.drawLine(p_c.x, p_c.y, p_l.x, p_l.y);
+        }
 
         String string = "";
         for (Point p : resEdge) {
             imageProcessor.drawDot(p.x, p.y);
         }
 
-        p_l = p_r = nullPoint;
+        double scaleValue = Tools.parseDouble(scaleTextField.getText());
 
         String type = "";
         if (isNewMax)
-            type = "Грибовидный";
+            type = "Headed";
         else
-            type = "Пеньковый";
-        IJ.showMessage("Метрика",
-                "Тип: " + type + "\n" +
-                "Perimetr= " + (edge.size()+maxLine.getLength()) + "\n" +
-                "Head Width= " + maxLine.getLength() + "\n" +
-                "Skeleton Length= " + skeleton.size());
+            type = "Stubby";
+
+        if (mode == FLOATING_INT) {
+            neck = new LineSegment(p_c.x, p_c.y, p_l.x, p_l.y);
+            IJ.showMessage("Floating spine metrics",
+                    "Type: " + "Headed" + "\n" +
+                            "Perimeter= " + (edge.size()+neck.getLength()*2)*scaleValue + "\n" +
+                            "Head Length= " + skeleton.size()*scaleValue + "\n" +
+                            "Head Width= " + (maxLine.getLength()*scaleValue) + "\n" +
+                            "Head Perimeter= " + edge.size()*scaleValue + "\n" +
+                            "Neck Length= " + neck.getLength()*scaleValue + "\n" +
+                            "Summary Length= " + (skeleton.size()+neck.getLength())*scaleValue);
+        } else
+            IJ.showMessage("Metrics",
+                "Type: " + type + "\n" +
+                    "Perimeter= " + ((edge.size()+baseLine.getLength())*scaleValue) + "\n" +
+                    "Head Width= " + maxLine.getLength()*scaleValue + "\n" +
+                    "Head Perimeter= " + edge.size()*scaleValue + "\n" +
+                    "Skeleton Length= " + skeleton.size()*scaleValue);
+
+        p_l = p_r = p_c = nullPoint;
     }
 
     private LinkedHashSet<Point> parseEdge(ImagePlus img, Point previous, Point nextPoint, LinkedHashSet<Point> edge, boolean isMovingUp, boolean isMovingLeft) {
