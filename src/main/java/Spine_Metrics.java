@@ -2,7 +2,9 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.WindowManager;
 import ij.gui.*;
+import ij.measure.Measurements;
 import ij.plugin.Commands;
+import ij.plugin.Selection;
 import ij.plugin.filter.Convolver;
 import ij.plugin.frame.PlugInFrame;
 import ij.plugin.frame.RoiManager;
@@ -311,18 +313,22 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
             yp[i] = (int)line.midPoint().y;
             nPoints++;
         }
-        IJ.setTool(5);
-        PolygonRoi skeleton = new PolygonRoi(xp, yp, nPoints, Roi.POLYLINE);
+        IJ.setTool(6);
+        PolygonRoi skeleton = new PolygonRoi(xp, yp, nPoints, Roi.FREELINE);
         PolygonRoi maxPolyLine = new PolygonRoi(new int[]{(int)maxLine.p0.x, (int)maxLine.p1.x},
-                                                new int[]{(int)maxLine.p0.y, (int)maxLine.p1.y}, 2, Roi.POLYLINE);
-        skeleton.setStrokeColor(Color.WHITE);
+                                                new int[]{(int)maxLine.p0.y, (int)maxLine.p1.y}, 2, Roi.FREELINE);
+
+        //imageProcessor.setRoi(skeleton);
+        //imageProcessor.setRoi(maxPolyLine);
+
+        //skeleton.setStrokeColor(Color.WHITE);
         //maxPolyLine.setStrokeColor(Color.WHITE);
-        imageProcessor.drawLine((int)maxLine.p0.x, (int)maxLine.p0.y, (int)maxLine.p1.x, (int)maxLine.p1.y);
+        //imageProcessor.drawLine((int)maxLine.p0.x, (int)maxLine.p0.y, (int)maxLine.p1.x, (int)maxLine.p1.y);
         //imageProcessor.drawRoi(skeleton);
         //imageProcessor.drawRoi(maxPolyLine);
 
-        skeleton.draw(img.getImage().getGraphics());
-        maxPolyLine.draw(img.getImage().getGraphics());
+        //skeleton.draw(img.getImage().getGraphics());
+        //maxPolyLine.draw(img.getImage().getGraphics());
 
         LineSegment neck;
         if (mode == FLOATING_INT) {
@@ -336,6 +342,17 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
         for (Point p : resEdge) {
             imageProcessor.drawDot(p.x, p.y);
         }
+
+
+
+        //IJ.setTool(3);
+        PolygonRoi contourRoi = new PolygonRoi( edgeArray.stream().mapToInt(px -> px.x).toArray(),
+                                                edgeArray.stream().mapToInt(px -> px.y).toArray(),
+                                                edgeArray.size(),
+                                                Roi.POLYGON);
+        RoiManager roiManager = new RoiManager();
+        roiManager.addRoi(contourRoi);
+        roiManager.multiMeasure(img).show("Results");
 
         double scaleValue = Tools.parseDouble(scaleTextField.getText());
 
