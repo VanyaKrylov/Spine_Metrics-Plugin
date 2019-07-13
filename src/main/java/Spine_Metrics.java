@@ -36,6 +36,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
     private ImagePlus img;
     private ImageWindow win;
     private ImageProcessor imageProcessor;
+    private RoiManager roiManager;
     PointRoi pointRoi;
     private int baseLineOrientation; /**Horizontal = 0, Vertival = 1 */
     private static final Point nullPoint = new Point(-1, -1);
@@ -79,6 +80,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
             win = img.getWindow();
             canvas = win.getCanvas();
             imageProcessor = img.getProcessor();
+            roiManager = new RoiManager();
             imageProcessor.setColor(128);
             Convolver cv = new Convolver();
             cv.setNormalize(false);
@@ -313,7 +315,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
             yp[i] = (int)line.midPoint().y;
             nPoints++;
         }
-        IJ.setTool(6);
+        //IJ.setTool(6);
         PolygonRoi skeleton = new PolygonRoi(xp, yp, nPoints, Roi.FREELINE);
         PolygonRoi maxPolyLine = new PolygonRoi(new int[]{(int)maxLine.p0.x, (int)maxLine.p1.x},
                                                 new int[]{(int)maxLine.p0.y, (int)maxLine.p1.y}, 2, Roi.FREELINE);
@@ -338,19 +340,14 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
             imageProcessor.drawLine(p_c.x, p_c.y, p_l.x, p_l.y);
         }
 
-        String string = "";
-        for (Point p : resEdge) {
+        /*for (Point p : resEdge) {
             imageProcessor.drawDot(p.x, p.y);
-        }
+        }*/
 
-
-
-        //IJ.setTool(3);
         PolygonRoi contourRoi = new PolygonRoi( edgeArray.stream().mapToInt(px -> px.x).toArray(),
                                                 edgeArray.stream().mapToInt(px -> px.y).toArray(),
                                                 edgeArray.size(),
                                                 Roi.POLYGON);
-        RoiManager roiManager = new RoiManager();
         roiManager.addRoi(contourRoi);
         roiManager.multiMeasure(img).show("Results");
 
