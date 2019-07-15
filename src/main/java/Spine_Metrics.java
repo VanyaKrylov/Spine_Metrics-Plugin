@@ -5,6 +5,7 @@ import ij.gui.*;
 import ij.measure.Measurements;
 import ij.plugin.Commands;
 import ij.plugin.Selection;
+import ij.plugin.filter.Analyzer;
 import ij.plugin.filter.Convolver;
 import ij.plugin.frame.PlugInFrame;
 import ij.plugin.frame.RoiManager;
@@ -349,7 +350,9 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                                                 edgeArray.size(),
                                                 Roi.POLYGON);
         roiManager.addRoi(contourRoi);
-        roiManager.multiMeasure(img).show("Results");
+        roiManager.runCommand("Measure");
+        Analyzer.getResultsTable().show("Results");
+        //roiManager.multiMeasure(img).show("Results");
 
         double scaleValue = Tools.parseDouble(scaleTextField.getText());
 
