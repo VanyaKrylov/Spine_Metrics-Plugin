@@ -3,6 +3,7 @@ import ij.ImagePlus;
 import ij.WindowManager;
 import ij.gui.*;
 import ij.measure.Measurements;
+import ij.measure.ResultsTable;
 import ij.plugin.Commands;
 import ij.plugin.Selection;
 import ij.plugin.filter.Analyzer;
@@ -38,6 +39,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
     private ImageWindow win;
     private ImageProcessor imageProcessor;
     private RoiManager roiManager;
+    private ResultsTable resultsTable;
     PointRoi pointRoi;
     private int baseLineOrientation; /**Horizontal = 0, Vertival = 1 */
     private static final Point nullPoint = new Point(-1, -1);
@@ -49,6 +51,8 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
         super("Testing");
         instance = this;
         IJ.setTool(7);
+        Analyzer.setMeasurements(Measurements.AREA+Measurements.PERIMETER);
+        resultsTable = Analyzer.getResultsTable();
 
         try {
             panel = new Panel();
@@ -349,9 +353,12 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                                                 edgeArray.stream().mapToInt(px -> px.y).toArray(),
                                                 edgeArray.size(),
                                                 Roi.POLYGON);
+        roiManager.deselect();
         roiManager.addRoi(contourRoi);
+        roiManager.select(roiManager.getCount()-1);
         roiManager.runCommand("Measure");
-        Analyzer.getResultsTable().show("Results");
+        //Analyzer.getResultsTable().show("Results");
+
         //roiManager.multiMeasure(img).show("Results");
 
         double scaleValue = Tools.parseDouble(scaleTextField.getText());
@@ -362,8 +369,16 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
         else
             type = "Stubby";
 
+        neck = new LineSegment(p_c.x, p_c.y, p_l.x, p_l.y);
+        ResultsPacker packer = (rt, t, headWidth, headPerimeter, skelLen) -> {
+            rt.addValue("Type", t);
+            rt.addValue("Head Width", headWidth);
+            rt.addValue("Head Perimeter", headPerimeter);
+            rt.addValue("Skeleton Length", skelLen);
+            rt.show("Results");
+        };
+
         if (mode == FLOATING_INT) {
-            neck = new LineSegment(p_c.x, p_c.y, p_l.x, p_l.y);
             IJ.showMessage("Floating spine metrics",
                     "Type: " + "Headed" + "\n" +
                             "Perimeter= " + (edge.size()+neck.getLength()*2)*scaleValue + "\n" +
@@ -372,16 +387,27 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                             "Head Perimeter= " + edge.size()*scaleValue + "\n" +
                             "Neck Length= " + neck.getLength()*scaleValue + "\n" +
                             "Summary Length= " + (skeleton.size()+neck.getLength())*scaleValue);
-        } else
-            IJ.showMessage("Metrics",
-                "Type: " + type + "\n" +
-                    "Perimeter= " + ((edge.size()+baseLine.getLength())*scaleValue) + "\n" +
-                    "Head Width= " + maxLine.getLength()*scaleValue + "\n" +
-                    "Head Perimeter= " + edge.size()*scaleValue + "\n" +
-                    "Skeleton Length= " + skeleton.size()*scaleValue);
-
+        } else {
+            packer.packResultsToTable(
+                    resultsTable,
+                    type,
+                    maxLine.getLength() * scaleValue,
+                    edge.size() * scaleValue,
+                    skeleton.size() * scaleValue
+            );
+            /*IJ.showMessage("Metrics",
+                    "Type: " + type + "\n" +
+                            "Perimeter= " + ((edge.size() + baseLine.getLength()) * scaleValue) + "\n" +
+                            "Head Width= " + maxLine.getLength() * scaleValue + "\n" +
+                            "Head Perimeter= " + edge.size() * scaleValue + "\n" +
+                            "Skeleton Length= " + skeleton.size() * scaleValue);*/
+        }
         p_l = p_r = p_c = nullPoint;
         //IJ.setTool(7);
+    }
+
+    interface ResultsPacker{
+        void packResultsToTable(ResultsTable rt, String t, double headWidth, double headPerimeter, double skelLen);
     }
 
     private LinkedHashSet<Point> parseEdge(ImagePlus img, Point previous, Point nextPoint, LinkedHashSet<Point> edge, boolean isMovingUp, boolean isMovingLeft) {
