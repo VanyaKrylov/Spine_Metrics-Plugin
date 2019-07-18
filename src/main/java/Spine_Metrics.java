@@ -4,25 +4,20 @@ import ij.WindowManager;
 import ij.gui.*;
 import ij.measure.Measurements;
 import ij.measure.ResultsTable;
-import ij.plugin.Commands;
-import ij.plugin.Selection;
 import ij.plugin.filter.Analyzer;
 import ij.plugin.filter.Convolver;
 import ij.plugin.frame.PlugInFrame;
 import ij.plugin.frame.RoiManager;
 import ij.process.ImageProcessor;
 import ij.util.Tools;
-import org.locationtech.jts.algorithm.Distance;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.LineSegment;
 import java.awt.*;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.util.*;
 
-public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyListener {
+public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
     Panel panel;
     Choice modeChoice;
@@ -44,7 +39,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
     private int baseLineOrientation; /**Horizontal = 0, Vertival = 1 */
     private static final Point nullPoint = new Point(-1, -1);
     private Point p_l, p_r, p_c;
-    private int prevImgHash;
     private int mode;
 
     public Spine_Metrics() {
@@ -108,7 +102,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
             //imageProcessor.copyBits(img2.getProcessor(), 0, 0, Blitter.MAX);
 
             canvas.imageUpdate(img.getImage(), 32, 0, 0, W, H);
-            prevImgHash = img.hashCode();
             p_l = p_c = p_r = nullPoint;
             mode = NORMAL_INT;
             canvas.addMouseListener(this);
@@ -116,8 +109,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
             IJ.showMessage("Error", e.getStackTrace().toString());
         }
     }
-
-    //PointToolOptions
 
     public Point getP_l() {
         return p_l;
@@ -138,7 +129,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
     public void mouseClicked(MouseEvent e) {
 
         imageProcessor.setColor(128);
-        Point p = nullPoint;
+        Point p;
         int x = canvas.offScreenX(e.getX());
         int y = canvas.offScreenY(e.getY());
         if (isSingle4Neighboured(x,y)) {
@@ -262,7 +253,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                 p_l = p_r = p_c = nullPoint;
                 return;
             }
-            resEdge = parseEdge(img, previous, nextPoint, edge, isMovingUp, isMovingLeft);
+            resEdge = parseEdge(img, previous, nextPoint, edge, isMovingUp, false);
         } else {
             while (verifyPoint(img, nextPoint.x, nextPoint.y+1)) {
                 nextPoint.y+=1;
@@ -294,7 +285,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                 p_l = p_r = p_c = nullPoint;
                 return;
             }
-            resEdge = parseEdge(img, previous, nextPoint, edge, isMovingUp, isMovingLeft);
+            resEdge = parseEdge(img, previous, nextPoint, edge, false, isMovingLeft);
         }
 
         if (resEdge.isEmpty()) {
@@ -305,8 +296,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
         int[] xp = new int[resEdge.size()/2 + 1];
         int[] yp = new int[resEdge.size()/2 + 1];
         int nPoints = 0;
-        ArrayList<Point> edgeArray =new ArrayList<>();
-        edgeArray.addAll(resEdge);
+        ArrayList<Point> edgeArray = new ArrayList<>(resEdge);
         LineSegment baseLine = new LineSegment(p_l.x, p_l.y, p_r.x, p_r.y);
         LineSegment maxLine = new LineSegment(edgeArray.get(0).x, edgeArray.get(0).y, edgeArray.get(edge.size()-1).x, edgeArray.get(edge.size()-1).y);
         boolean isNewMax = false;
@@ -320,7 +310,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
             yp[i] = (int)line.midPoint().y;
             nPoints++;
         }
-        //IJ.setTool(6);
         PolygonRoi skeleton = new PolygonRoi(xp, yp, nPoints, Roi.FREELINE);
         PolygonRoi maxPolyLine = new PolygonRoi(new int[]{(int)maxLine.p0.x, (int)maxLine.p1.x},
                                                 new int[]{(int)maxLine.p0.y, (int)maxLine.p1.y}, 2, Roi.FREELINE);
@@ -348,7 +337,10 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
         /*for (Point p : resEdge) {
             imageProcessor.drawDot(p.x, p.y);
         }*/
-
+        if (mode==FLOATING_INT) {
+            edgeArray.add(edgeArray.size(), p_c);
+            edgeArray.add(0, new Point(p_c.x+1, p_c.y));
+        }
         PolygonRoi contourRoi = new PolygonRoi( edgeArray.stream().mapToInt(px -> px.x).toArray(),
                                                 edgeArray.stream().mapToInt(px -> px.y).toArray(),
                                                 edgeArray.size(),
@@ -357,28 +349,39 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
         roiManager.addRoi(contourRoi);
         roiManager.select(roiManager.getCount()-1);
         roiManager.runCommand("Measure");
-        //Analyzer.getResultsTable().show("Results");
 
         //roiManager.multiMeasure(img).show("Results");
 
         double scaleValue = Tools.parseDouble(scaleTextField.getText());
 
-        String type = "";
+        String type;
         if (isNewMax)
             type = "Headed";
         else
             type = "Stubby";
 
         neck = new LineSegment(p_c.x, p_c.y, p_l.x, p_l.y);
-        ResultsPacker packer = (rt, t, headWidth, headPerimeter, skelLen) -> {
-            rt.addValue("Type", t);
+        ResultsPacker packer = (rt, t, headWidth, headPerimeter, skelLen, neckLen, sumLen) -> {
+            rt.addValue("Type", (mode==FLOATING_INT)?"Headed":t);
+            rt.addValue((mode==FLOATING_INT)?"HeadLength":"Skeleton Length", skelLen);
             rt.addValue("Head Width", headWidth);
-            rt.addValue("Head Perimeter", headPerimeter);
-            rt.addValue("Skeleton Length", skelLen);
+            rt.addValue("Head Perimeter", headPerimeter); //TODO: in NORMAl mode add neck detection and calc
+            rt.addValue("Neck Length", neckLen);
+            rt.addValue("Summary Length", sumLen);
             rt.show("Results");
         };
 
-        if (mode == FLOATING_INT) {
+        packer.packResultsToTable(
+                resultsTable,
+                type,
+                maxLine.getLength() * scaleValue,
+                edge.size() * scaleValue,
+                skeleton.size() * scaleValue,
+                (mode==FLOATING_INT)?(neck.getLength()*scaleValue):0.0,
+                (mode==FLOATING_INT)?((skeleton.size()+neck.getLength())*scaleValue):0
+        );
+
+        /*if (mode == FLOATING_INT) {
             IJ.showMessage("Floating spine metrics",
                     "Type: " + "Headed" + "\n" +
                             "Perimeter= " + (edge.size()+neck.getLength()*2)*scaleValue + "\n" +
@@ -388,26 +391,19 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
                             "Neck Length= " + neck.getLength()*scaleValue + "\n" +
                             "Summary Length= " + (skeleton.size()+neck.getLength())*scaleValue);
         } else {
-            packer.packResultsToTable(
-                    resultsTable,
-                    type,
-                    maxLine.getLength() * scaleValue,
-                    edge.size() * scaleValue,
-                    skeleton.size() * scaleValue
-            );
-            /*IJ.showMessage("Metrics",
+            IJ.showMessage("Metrics",
                     "Type: " + type + "\n" +
                             "Perimeter= " + ((edge.size() + baseLine.getLength()) * scaleValue) + "\n" +
                             "Head Width= " + maxLine.getLength() * scaleValue + "\n" +
                             "Head Perimeter= " + edge.size() * scaleValue + "\n" +
-                            "Skeleton Length= " + skeleton.size() * scaleValue);*/
-        }
+                            "Skeleton Length= " + skeleton.size() * scaleValue);
+        }*/
         p_l = p_r = p_c = nullPoint;
         //IJ.setTool(7);
     }
 
     interface ResultsPacker{
-        void packResultsToTable(ResultsTable rt, String t, double headWidth, double headPerimeter, double skelLen);
+        void packResultsToTable(ResultsTable rt, String t, double headWidth, double headPerimeter, double skelLen, double neckLen, double sumLen);
     }
 
     private LinkedHashSet<Point> parseEdge(ImagePlus img, Point previous, Point nextPoint, LinkedHashSet<Point> edge, boolean isMovingUp, boolean isMovingLeft) {
@@ -550,18 +546,4 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener, KeyList
     @Override
     public void mouseExited(MouseEvent e) {}
 
-    @Override
-    public void keyTyped(KeyEvent e) {
-        IJ.controlKeyDown();
-    }
-
-    @Override
-    public void keyPressed(KeyEvent e) {
-
-    }
-
-    @Override
-    public void keyReleased(KeyEvent e) {
-
-    }
 }
