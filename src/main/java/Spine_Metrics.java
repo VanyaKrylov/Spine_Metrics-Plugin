@@ -27,6 +27,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
     private static final String FLOATING = "Floating spine";
     private static final int NORMAL_INT = 0;
     private static final int FLOATING_INT = 1;
+    private static final double NECK_THRESHOLD = 1.2;
 
     private ImageCanvas canvas;
     private static Frame instance;
@@ -197,6 +198,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         edge.add(new Point(p_l));
         boolean isMovingUp = false;
         boolean isMovingLeft = false;
+        int neckIndex = -1;
 
         if (mode == FLOATING_INT) {
             if (verifyPoint(img, p_l.x-1, p_l.y)) {
@@ -299,17 +301,32 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         ArrayList<Point> edgeArray = new ArrayList<>(resEdge);
         LineSegment baseLine = new LineSegment(p_l.x, p_l.y, p_r.x, p_r.y);
         LineSegment maxLine = new LineSegment(edgeArray.get(0).x, edgeArray.get(0).y, edgeArray.get(edge.size()-1).x, edgeArray.get(edge.size()-1).y);
+        LineSegment prevLine = baseLine;
         boolean isNewMax = false;
+        boolean neckFound = false;
+
         for (int i = 0; i < resEdge.size()/2; i++) {
             LineSegment line = new LineSegment(edgeArray.get(i).x, edgeArray.get(i).y, edgeArray.get(resEdge.size()-i-1).x, edgeArray.get(resEdge.size()-i-1).y);
             if (line.getLength() > maxLine.getLength()+2) {
                 maxLine = line;
                 isNewMax = true;
             }
+            if (prevLine.getLength()*NECK_THRESHOLD < line.getLength() && !neckFound && mode==NORMAL_INT) {
+                neckIndex = i;
+                neckFound = true;
+            } else
+                prevLine = new LineSegment(line);
             xp[i] = (int)line.midPoint().x;
             yp[i] = (int)line.midPoint().y;
             nPoints++;
         }
+
+        Optional<PolygonRoi> headSkel = Optional.ofNullable((neckFound) ? new PolygonRoi(
+                Arrays.copyOfRange(xp, neckIndex, nPoints - neckIndex),
+                Arrays.copyOfRange(yp, neckIndex, nPoints - neckIndex),
+                nPoints - 2 * neckIndex,
+                Roi.FREELINE)
+                :null);
         PolygonRoi skeleton = new PolygonRoi(xp, yp, nPoints, Roi.FREELINE);
         PolygonRoi maxPolyLine = new PolygonRoi(new int[]{(int)maxLine.p0.x, (int)maxLine.p1.x},
                                                 new int[]{(int)maxLine.p0.y, (int)maxLine.p1.y}, 2, Roi.FREELINE);
@@ -345,6 +362,8 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                                                 edgeArray.stream().mapToInt(px -> px.y).toArray(),
                                                 edgeArray.size(),
                                                 Roi.POLYGON);
+        contourRoi.enableSubPixelResolution();
+        contourRoi.setDrawOffset(true);
         roiManager.deselect();
         roiManager.addRoi(contourRoi);
         roiManager.select(roiManager.getCount()-1);
@@ -354,18 +373,14 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
         double scaleValue = Tools.parseDouble(scaleTextField.getText());
 
-        String type;
-        if (isNewMax)
-            type = "Headed";
-        else
-            type = "Stubby";
+        String type = (neckFound || mode==FLOATING_INT)?"Headed":"Stubby";
 
         neck = new LineSegment(p_c.x, p_c.y, p_l.x, p_l.y);
         ResultsPacker packer = (rt, t, headWidth, headPerimeter, skelLen, neckLen, sumLen) -> {
-            rt.addValue("Type", (mode==FLOATING_INT)?"Headed":t);
-            rt.addValue((mode==FLOATING_INT)?"HeadLength":"Skeleton Length", skelLen);
+            rt.addValue("Type", t);
             rt.addValue("Head Width", headWidth);
             rt.addValue("Head Perimeter", headPerimeter); //TODO: in NORMAl mode add neck detection and calc
+            rt.addValue("HeadLength", skelLen);
             rt.addValue("Neck Length", neckLen);
             rt.addValue("Summary Length", sumLen);
             rt.show("Results");
@@ -375,10 +390,10 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 resultsTable,
                 type,
                 maxLine.getLength() * scaleValue,
-                edge.size() * scaleValue,
-                skeleton.size() * scaleValue,
-                (mode==FLOATING_INT)?(neck.getLength()*scaleValue):0.0,
-                (mode==FLOATING_INT)?((skeleton.size()+neck.getLength())*scaleValue):0
+                (resEdge.size() - (neckIndex+1)*2) * scaleValue,
+                headSkel.orElse(skeleton).getLength() * scaleValue,
+                (mode==FLOATING_INT)?(neck.getLength()*scaleValue):skeleton.getLength()-headSkel.orElse(skeleton).getLength(),
+                (mode==FLOATING_INT)?((skeleton.size()+neck.getLength())*scaleValue):skeleton.getLength()
         );
 
         /*if (mode == FLOATING_INT) {
