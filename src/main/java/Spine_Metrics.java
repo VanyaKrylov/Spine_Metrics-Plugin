@@ -322,14 +322,18 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         }
 
         Optional<PolygonRoi> headSkel = Optional.ofNullable((neckFound) ? new PolygonRoi(
-                Arrays.copyOfRange(xp, neckIndex, nPoints - neckIndex),
-                Arrays.copyOfRange(yp, neckIndex, nPoints - neckIndex),
-                nPoints - 2 * neckIndex,
+                Arrays.copyOfRange(xp, neckIndex, nPoints-1),
+                Arrays.copyOfRange(yp, neckIndex, nPoints-1),
+                nPoints - neckIndex - 1,
                 Roi.FREELINE)
-                :null);
+                : null);
         PolygonRoi skeleton = new PolygonRoi(xp, yp, nPoints, Roi.FREELINE);
         PolygonRoi maxPolyLine = new PolygonRoi(new int[]{(int)maxLine.p0.x, (int)maxLine.p1.x},
                                                 new int[]{(int)maxLine.p0.y, (int)maxLine.p1.y}, 2, Roi.FREELINE);
+
+        skeleton.enableSubPixelResolution();
+        skeleton.setDrawOffset(true);
+        img.setOverlay(skeleton, Color.YELLOW, 0, null);
 
         //imageProcessor.setRoi(skeleton);
         //imageProcessor.setRoi(maxPolyLine);
@@ -343,18 +347,17 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         //skeleton.draw(img.getImage().getGraphics());
         //maxPolyLine.draw(img.getImage().getGraphics());
 
-        LineSegment neck;
-        if (mode == FLOATING_INT) {
-            //neck = new LineSegment(p_c.x, p_c.y, p_l.x, p_l.y);
-            //PolygonRoi neckLine = new PolygonRoi(new int[]{(int) neck.p0.x, (int) neck.p1.x},
-                    //new int[]{(int) neck.p0.y, (int) neck.p1.y}, 2, Roi.POLYLINE);
-            imageProcessor.drawLine(p_c.x, p_c.y, p_l.x, p_l.y);
-        }
-
-        /*for (Point p : resEdge) {
-            imageProcessor.drawDot(p.x, p.y);
-        }*/
+        Optional<PolygonRoi> headContour = Optional.ofNullable((neckFound) ? new PolygonRoi(
+                edgeArray.subList(neckIndex, edgeArray.size() - neckIndex-1).stream().mapToInt(px -> px.x).toArray(),
+                edgeArray.subList(neckIndex, edgeArray.size() - neckIndex-1).stream().mapToInt(px -> px.y).toArray(),
+                edgeArray.size() - (2 * neckIndex)-2,
+                Roi.POLYGON)
+                : null);
         if (mode==FLOATING_INT) {
+            headContour = Optional.of(new PolygonRoi( edgeArray.stream().mapToInt(px -> px.x).toArray(),
+                    edgeArray.stream().mapToInt(px -> px.y).toArray(),
+                    edgeArray.size(),
+                    Roi.POLYGON));
             edgeArray.add(edgeArray.size(), p_c);
             edgeArray.add(0, new Point(p_c.x+1, p_c.y));
         }
@@ -364,6 +367,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                                                 Roi.POLYGON);
         contourRoi.enableSubPixelResolution();
         contourRoi.setDrawOffset(true);
+        contourRoi.setStrokeColor(Color.red);
         roiManager.deselect();
         roiManager.addRoi(contourRoi);
         roiManager.select(roiManager.getCount()-1);
@@ -372,10 +376,9 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         //roiManager.multiMeasure(img).show("Results");
 
         double scaleValue = Tools.parseDouble(scaleTextField.getText());
-
         String type = (neckFound || mode==FLOATING_INT)?"Headed":"Stubby";
+        LineSegment neck = new LineSegment(p_c.x, p_c.y, p_l.x, p_l.y);
 
-        neck = new LineSegment(p_c.x, p_c.y, p_l.x, p_l.y);
         ResultsPacker packer = (rt, t, headWidth, headPerimeter, skelLen, neckLen, sumLen) -> {
             rt.addValue("Type", t);
             rt.addValue("Head Width", headWidth);
