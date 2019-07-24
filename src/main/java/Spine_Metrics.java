@@ -34,6 +34,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
     private ImagePlus img;
     private ImageWindow win;
     private ImageProcessor imageProcessor;
+    private Overlay overlay;
     private RoiManager roiManager;
     private ResultsTable resultsTable;
     PointRoi pointRoi;
@@ -330,10 +331,22 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         PolygonRoi skeleton = new PolygonRoi(xp, yp, nPoints, Roi.FREELINE);
         PolygonRoi maxPolyLine = new PolygonRoi(new int[]{(int)maxLine.p0.x, (int)maxLine.p1.x},
                                                 new int[]{(int)maxLine.p0.y, (int)maxLine.p1.y}, 2, Roi.FREELINE);
+        RoiPropertiesTuner tuner = (roi, color) -> {
+            roi.enableSubPixelResolution();
+            roi.setDrawOffset(true);
+            roi.setStrokeWidth(0);
+            roi.setStrokeColor(color);
+        };
 
-        skeleton.enableSubPixelResolution();
-        skeleton.setDrawOffset(true);
-        img.setOverlay(skeleton, Color.YELLOW, 0, null);
+        tuner.tuneRoiProperties(skeleton, Color.YELLOW);
+        tuner.tuneRoiProperties(maxPolyLine, Color.YELLOW);
+        overlay = new Overlay(skeleton);
+        overlay.add(maxPolyLine);
+        if (headSkel.isPresent()) {
+            tuner.tuneRoiProperties(headSkel.get(), Color.RED);
+            overlay.add(headSkel.get());
+        }
+        //img.setOverlay(skeleton, Color.YELLOW, 0, null);
 
         //imageProcessor.setRoi(skeleton);
         //imageProcessor.setRoi(maxPolyLine);
@@ -350,7 +363,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         Optional<PolygonRoi> headContour = Optional.ofNullable((neckFound) ? new PolygonRoi(
                 edgeArray.subList(neckIndex, edgeArray.size() - neckIndex-1).stream().mapToInt(px -> px.x).toArray(),
                 edgeArray.subList(neckIndex, edgeArray.size() - neckIndex-1).stream().mapToInt(px -> px.y).toArray(),
-                edgeArray.size() - (2 * neckIndex)-2,
+                edgeArray.size() - (2 * neckIndex)-1,
                 Roi.POLYGON)
                 : null);
         if (mode==FLOATING_INT) {
@@ -365,13 +378,12 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                                                 edgeArray.stream().mapToInt(px -> px.y).toArray(),
                                                 edgeArray.size(),
                                                 Roi.POLYGON);
-        contourRoi.enableSubPixelResolution();
-        contourRoi.setDrawOffset(true);
-        contourRoi.setStrokeColor(Color.red);
+        tuner.tuneRoiProperties(contourRoi, Color.GREEN);
         roiManager.deselect();
         roiManager.addRoi(contourRoi);
         roiManager.select(roiManager.getCount()-1);
         roiManager.runCommand("Measure");
+        img.setOverlay(overlay);
 
         //roiManager.multiMeasure(img).show("Results");
 
@@ -422,6 +434,10 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
 
     interface ResultsPacker{
         void packResultsToTable(ResultsTable rt, String t, double headWidth, double headPerimeter, double skelLen, double neckLen, double sumLen);
+    }
+
+    interface RoiPropertiesTuner{
+        void tuneRoiProperties(Roi roi, Color color);
     }
 
     private LinkedHashSet<Point> parseEdge(ImagePlus img, Point previous, Point nextPoint, LinkedHashSet<Point> edge, boolean isMovingUp, boolean isMovingLeft) {
