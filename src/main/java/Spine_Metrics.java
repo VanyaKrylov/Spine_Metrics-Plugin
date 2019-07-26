@@ -4,6 +4,7 @@ import ij.WindowManager;
 import ij.gui.*;
 import ij.measure.Measurements;
 import ij.measure.ResultsTable;
+import ij.plugin.Selection;
 import ij.plugin.filter.Analyzer;
 import ij.plugin.filter.Convolver;
 import ij.plugin.frame.PlugInFrame;
@@ -77,7 +78,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
             setVisible(true);
 
             img = WindowManager.getCurrentImage();
-            ImagePlus img2 = img.duplicate();
             win = img.getWindow();
             canvas = win.getCanvas();
             imageProcessor = img.getProcessor();
@@ -99,10 +99,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                         imageProcessor.set(i,j,255);
                 }
             }
-
-            //IJ.run(img2, "Skeletonize (2D/3D)", "");
-            //imageProcessor.copyBits(img2.getProcessor(), 0, 0, Blitter.MAX);
-
             canvas.imageUpdate(img.getImage(), 32, 0, 0, W, H);
             p_l = p_c = p_r = nullPoint;
             mode = NORMAL_INT;
@@ -110,18 +106,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         } catch (Exception e) {
             IJ.showMessage("Error", e.getStackTrace().toString());
         }
-    }
-
-    public Point getP_l() {
-        return p_l;
-    }
-
-    public Point getP_c() {
-        return p_c;
-    }
-
-    public Point getP_r() {
-        return p_r;
     }
 
     /**
@@ -134,22 +118,23 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         Point p;
         int x = canvas.offScreenX(e.getX());
         int y = canvas.offScreenY(e.getY());
-        if (isSingle4Neighboured(x,y)) {
+        if (!verifyPoint(img,x,y)) {
+            IJ.showMessage("Wrong Input", "Can't choose background pixels");
+            IJ.run("Select None"); //TODO restore the current point if needed
+        } else if (isSingle4Neighboured(x,y)) {
             IJ.showMessage("Wrong Input", "Can't choose point with a single neighbour");
-            return;
-        }
-        img = canvas.getImage();
-        imageProcessor.snapshot();
-        p = new Point(x,y);
+            IJ.run("Select None"); //TODO --//--
+        } else {
+            img = canvas.getImage();
+            imageProcessor.snapshot();
+            p = new Point(x, y);
 
-        pointRoi = new PointRoi(x,y,img);
-        imageProcessor.setRoi(pointRoi);
-        //pointRoi.draw(img.getImage().getGraphics());
+            pointRoi = new PointRoi(x, y, img);
+            imageProcessor.setRoi(pointRoi);
+            //pointRoi.draw(img.getImage().getGraphics());
 
-        if (modeChoice.getSelectedItem().equals(NORMAL)){
-            mode = NORMAL_INT;
-            if (verifyPoint(img, p)) {
-                //imageProcessor.drawDot(p.x, p.y);
+            if (modeChoice.getSelectedItem().equals(NORMAL)) {
+                mode = NORMAL_INT;
                 if (p_l.equals(nullPoint))
                     p_l = new Point(p);
                 else {
@@ -169,12 +154,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                     process2(img);
                 }
             } else {
-                IJ.showMessage("Wrong Input", "Can't choose background pixels");
-            }
-        } else {
-            mode = FLOATING_INT;
-            if (verifyPoint(img, p)) {
-                //imageProcessor.drawDot(p.x, p.y);
+                mode = FLOATING_INT;
                 if (p_l.equals(nullPoint))
                     p_l = new Point(p);
                 else {
@@ -213,10 +193,11 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                     p_r = new Point(p_l);
                     p_l.x+=1;
                     baseLineOrientation = 0;
-                } else {
+                } else { //TODO make it a lambda, too much copy-paste
                     IJ.showMessage("Error", "Unable to recognize structure");
+                    imageProcessor.reset();
                     p_l = p_r = p_c = nullPoint;
-                    return;
+                    return; //TODO this return is bullshit
                 }
             }
         }
@@ -229,6 +210,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 nextPoint.x+=1;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    imageProcessor.reset();
                     p_l = p_r = p_c = nullPoint;
                     return;
                 }
@@ -240,6 +222,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 isMovingUp = true;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    imageProcessor.reset();
                     p_l = p_r = p_c = nullPoint;
                     return;
                 }
@@ -248,11 +231,13 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 nextPoint.y+=1;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    imageProcessor.reset();
                     p_l = p_r = p_c = nullPoint;
                     return;
                 }
             } else {
                 IJ.showMessage("Error", "Unable to recognize structure");
+                imageProcessor.reset();
                 p_l = p_r = p_c = nullPoint;
                 return;
             }
@@ -262,6 +247,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 nextPoint.y+=1;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    imageProcessor.reset();
                     p_l = p_r = p_c = nullPoint;
                     return;
                 }
@@ -272,6 +258,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 isMovingLeft = true;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    imageProcessor.reset();
                     p_l = p_r = p_c = nullPoint;
                     return;
                 }
@@ -280,11 +267,13 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 nextPoint.x+=1;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    imageProcessor.reset();
                     p_l = p_r = p_c = nullPoint;
                     return;
                 }
             } else {
                 IJ.showMessage("Error", "Unable to recognize structure");
+                imageProcessor.reset();
                 p_l = p_r = p_c = nullPoint;
                 return;
             }
@@ -303,14 +292,12 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         LineSegment baseLine = new LineSegment(p_l.x, p_l.y, p_r.x, p_r.y);
         LineSegment maxLine = new LineSegment(edgeArray.get(0).x, edgeArray.get(0).y, edgeArray.get(edge.size()-1).x, edgeArray.get(edge.size()-1).y);
         LineSegment prevLine = baseLine;
-        boolean isNewMax = false;
         boolean neckFound = false;
 
         for (int i = 0; i < resEdge.size()/2; i++) {
             LineSegment line = new LineSegment(edgeArray.get(i).x, edgeArray.get(i).y, edgeArray.get(resEdge.size()-i-1).x, edgeArray.get(resEdge.size()-i-1).y);
             if (line.getLength() > maxLine.getLength()+2) {
                 maxLine = line;
-                isNewMax = true;
             }
             if (prevLine.getLength()*NECK_THRESHOLD < line.getLength() && !neckFound && mode==NORMAL_INT) {
                 neckIndex = i;
@@ -444,6 +431,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 }
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    imageProcessor.reset();
                     return new LinkedHashSet<>();
                 }
             }
@@ -463,6 +451,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 }
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    imageProcessor.reset();
                     return new LinkedHashSet<>();
                 }
             }
@@ -476,6 +465,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 isMovingLeft = false;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    imageProcessor.reset();
                     return new LinkedHashSet<>();
                 }
             }
@@ -489,6 +479,7 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
                 nextPoint.y += 1;
                 if (!edge.add(new Point(nextPoint))) {
                     IJ.showMessage("Error", "Unable to parse the edge");
+                    imageProcessor.reset();
                     return new LinkedHashSet<>();
                 }
             }
