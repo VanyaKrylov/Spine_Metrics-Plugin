@@ -323,9 +323,9 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
         }
 
         Optional<PolygonRoi> headSkel = Optional.ofNullable((neckFound) ? new PolygonRoi(
-                Arrays.copyOfRange(xp, neckIndex, nPoints-1),
-                Arrays.copyOfRange(yp, neckIndex, nPoints-1),
-                nPoints - neckIndex - 1,
+                Arrays.copyOfRange(xp, neckIndex, nPoints),
+                Arrays.copyOfRange(yp, neckIndex, nPoints),
+                nPoints - neckIndex,
                 Roi.FREELINE)
                 : null);
         PolygonRoi skeleton = new PolygonRoi(xp, yp, nPoints, Roi.FREELINE);
@@ -346,19 +346,6 @@ public class Spine_Metrics extends PlugInFrame implements MouseListener {
             tuner.tuneRoiProperties(headSkel.get(), Color.RED);
             overlay.add(headSkel.get());
         }
-        //img.setOverlay(skeleton, Color.YELLOW, 0, null);
-
-        //imageProcessor.setRoi(skeleton);
-        //imageProcessor.setRoi(maxPolyLine);
-
-        //skeleton.setStrokeColor(Color.WHITE);
-        //maxPolyLine.setStrokeColor(Color.WHITE);
-        //imageProcessor.drawLine((int)maxLine.p0.x, (int)maxLine.p0.y, (int)maxLine.p1.x, (int)maxLine.p1.y);
-        //imageProcessor.drawRoi(skeleton);
-        //imageProcessor.drawRoi(maxPolyLine);
-
-        //skeleton.draw(img.getImage().getGraphics());
-        //maxPolyLine.draw(img.getImage().getGraphics());
 
         Optional<PolygonRoi> headContour = Optional.ofNullable((neckFound) ? new PolygonRoi(
                 edgeArray.subList(neckIndex, edgeArray.size() - neckIndex-1).stream().mapToInt(px -> px.x).toArray(),
