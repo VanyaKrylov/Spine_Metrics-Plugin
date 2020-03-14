@@ -12,7 +12,7 @@ A plugin for [Fiji](https://github.com/fiji/fiji) to calcute dendritic spine met
    * perimetr
    * area
 
-Results are represented in a ResultTable which can be saved and converted into different format.
+Results are represented in a ResultTable which can be saved locally and converted into different format.
 
 ## Requirements:
 * Single binary image [Example](https://github.com/VanyaKrylov/Spine_Metrics-Plugin/blob/master/pic.tif)
