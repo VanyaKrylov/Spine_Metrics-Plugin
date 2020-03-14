@@ -4,10 +4,12 @@
 A plugin for [Fiji](https://github.com/fiji/fiji) to calcute dendritic spine metrics with semi-automatic algorithm
 
 ## Requirements:
-* Binary image
+* Single binary image
+
 Types of spines supported:
 * Normal spines
 * Floating (detached) spines 
+
 To increase accuracy and perfomance for spines of small size use Fiji upscale function
 
 ## Usage
