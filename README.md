@@ -5,12 +5,12 @@ A plugin for [Fiji](https://github.com/fiji/fiji) to calcute dendritic spine met
 
 1. Determines spine type (based on the threshold value of neck differential
 2. Calculates the following metrics of a spine:
-* Neck width (doesn't apply for stubbed spine)
-* Neck length (doesn't apply for stubbed spine)
-* spine head width
-* spine length
-* perimetr
-* area
+  * Neck width (doesn't apply for stubbed spine)
+  * Neck length (doesn't apply for stubbed spine)
+  * spine head width
+  * spine length
+  * perimetr
+  * area
 
 Results are represented in a ResultTable which can be saved and converted into different format.
 
