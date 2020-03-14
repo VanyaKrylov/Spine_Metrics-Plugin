@@ -1,7 +1,7 @@
 # Spine Metrics Plugin 
 
 ## Description
-A plugin for (Fiji)[https://github.com/fiji/fiji] to calcute dendritic spine metrics with semi-automatic algorithm
+A plugin for [Fiji](https://github.com/fiji/fiji) to calcute dendritic spine metrics with semi-automatic algorithm
 
 ## Requirements:
 * Binary image
