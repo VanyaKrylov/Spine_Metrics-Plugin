@@ -25,5 +25,7 @@ To increase accuracy and perfomance for spines of small size use Fiji upscale fu
 
 ## Usage
 1. Choose spine type
+
 2(Normal spine). Choose base points in any order for Normal spines 
+
 2(Floating spine). Choose attach point on dendrit AND THEN point on the detached spine
